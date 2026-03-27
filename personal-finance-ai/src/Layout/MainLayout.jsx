@@ -1,7 +1,6 @@
 // File: src/layouts/MainLayout.jsx
-import Sidebar from '../components/Sidebar';
-import ChatbotPanel from '../components/ChatbotPanel';
-
+import Sidebar from '../components/Sidebar.jsx';
+import ChatbotPanel from '../components/ChatbotPanel.jsx'
 export default function MainLayout({ children }) {
     return (
         <div className="flex h-screen bg-[#F9FAFB] text-gray-900 overflow-hidden font-sans">
