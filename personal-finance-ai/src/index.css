@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #F9FAFB;
+  color: #111827;
+  /* Chữ màu xám đen đậm */
+}
