@@ -33,9 +33,10 @@ public class GeminiService {
 
     public Transaction processTransaction(String userInput) {
         String promptText = "Phân tích câu: '" + userInput + "'. " +
-                            "Trả về JSON: {\"amount\": số, \"note\": \"nội dung\", \"type\": \"INCOME\" hoặc \"EXPENSE\", \"categoryName\": \"tên nhóm\"}. " +
+                            "Trả về JSON: {\"amount\": số, \"note\": \"nội dung\", \"type\": \"INCOME\" hoặc \"EXPENSE\", \"categoryName\": \"tên nhóm\", \"isAnomaly\": true/false}. " +
                             "Quy tắc số tiền: Tự quy đổi 'k' thành hàng nghìn, 'triệu' thành hàng triệu (Ví dụ: 45k -> 45000). " +
-                            "Quy tắc categoryName CHỈ CHỌN: 'Ăn uống', 'Tiền lương', 'Mua tài liệu', 'Tiền tiêu vặt', 'Khác'.";
+                            "Quy tắc categoryName CHỈ CHỌN: 'Ăn uống', 'Tiền lương', 'Mua tài liệu', 'Tiền tiêu vặt', 'Khác'. " +
+                            "Quy tắc isAnomaly (Phát hiện bất thường): Đánh giá tính hợp lý của số tiền so với mục đích chi tiêu. Nếu số tiền chi tiêu lớn một cách vô lý hoặc bất thường (ví dụ: ăn sáng/ăn uống tốn hơn 2 triệu, mua tài liệu tốn hàng chục triệu...), hãy đặt isAnomaly là true. Ngược lại là false.";
 
         Map<String, Object> body = Map.of(
             "contents", List.of(Map.of("parts", List.of(Map.of("text", promptText))))
@@ -60,12 +61,68 @@ public class GeminiService {
             transaction.setType(data.path("type").asText());
             transaction.setTransactionDate(LocalDate.now());
             
-            // Gộp categoryName và note để Controller dễ xử lý
+            
+            if (data.has("isAnomaly")) {
+                transaction.setIsAnomaly(data.path("isAnomaly").asBoolean());
+            } else {
+                transaction.setIsAnomaly(false);
+            }
+            
             transaction.setNote(data.path("categoryName").asText() + "|" + data.path("note").asText());
 
             return transaction;
         } catch (Exception e) {
             return null;
+        }
+    }
+    
+    public String analyzeSpending(List<Transaction> transactions) {
+        if (transactions == null || transactions.isEmpty()) {
+            return "{\"message\": \"Chưa có dữ liệu để phân tích.\"}";
+        }
+
+        
+        StringBuilder dataBuilder = new StringBuilder();
+        for (Transaction t : transactions) {
+            String catName = t.getCategory() != null ? t.getCategory().getName() : "Khác";
+            dataBuilder.append("- Ngày: ").append(t.getTransactionDate())
+                       .append(" | Loại: ").append(t.getType())
+                       .append(" | Danh mục: ").append(catName)
+                       .append(" | Số tiền: ").append(t.getAmount()).append(" VNĐ\n");
+        }
+
+       
+        String promptText = "Bạn là một chuyên gia cố vấn tài chính cá nhân. " +
+                "Dưới đây là lịch sử thu chi của tôi:\n" + dataBuilder.toString() + "\n" +
+                "Dựa vào dữ liệu này, hãy thực hiện 3 việc:\n" +
+                "1. Phân tích và dự đoán xu hướng chi tiêu (tôi đang chi nhiều nhất vào đâu, tháng tới sẽ ra sao).\n" +
+                "2. Đánh giá xem có khoản chi nào đang bất thường hoặc lãng phí không.\n" +
+                "3. Đưa ra 3 lời khuyên thiết thực để cắt giảm chi tiêu và tiết kiệm.\n" +
+                "Trả về JSON ĐÚNG cấu trúc sau: {\"analysis\": \"bài phân tích\", \"prediction\": \"dự đoán\", \"advice\": [\"khuyên 1\", \"khuyên 2\", \"khuyên 3\"]}. Không trả về gì khác ngoài JSON.";
+
+        Map<String, Object> body = Map.of(
+            "contents", List.of(Map.of("parts", List.of(Map.of("text", promptText))))
+        );
+
+        try {
+            String response = webClient.post()
+                .uri(uriBuilder -> uriBuilder.path("/v1beta/models/gemini-2.5-flash:generateContent").queryParam("key", apiKey).build())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            JsonNode root = objectMapper.readTree(response);
+            String rawText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+          
+            return rawText.replace("```json", "").replace("```", "").trim();
+        } catch (Exception e) {
+            // 1. In toàn bộ lỗi đỏ ra màn hình Terminal của VS Code để chúng ta đọc
+            e.printStackTrace(); 
+            
+            // 2. Trả thẳng câu thông báo lỗi chi tiết lên Postman
+            return "{\"error\": \"Lỗi chi tiết: " + e.getMessage() + "\"}";
         }
     }
 }

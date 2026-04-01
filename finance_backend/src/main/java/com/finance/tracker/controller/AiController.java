@@ -43,4 +43,13 @@ public class AiController {
         }
         return null;
     }
+ 
+    @GetMapping("/analyze")
+    public String analyzeSpending() {
+       
+        java.util.List<Transaction> allTransactions = transactionRepository.findAll();
+        
+       
+        return geminiService.analyzeSpending(allTransactions);
+    }
 }
