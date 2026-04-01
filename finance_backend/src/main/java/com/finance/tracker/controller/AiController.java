@@ -1,5 +1,5 @@
 package com.finance.tracker.controller;
-
+import org.springframework.web.multipart.MultipartFile;
 import com.finance.tracker.model.Transaction;
 import com.finance.tracker.model.Category;
 import com.finance.tracker.repository.TransactionRepository;
@@ -51,5 +51,28 @@ public class AiController {
         
        
         return geminiService.analyzeSpending(allTransactions);
+    }
+    @PostMapping(value = "/process-receipt", consumes = {"multipart/form-data"})
+    public Transaction processReceipt(@RequestParam("file") MultipartFile file) {
+        // 1. Chuyền file ảnh cho AI xử lý
+        Transaction transaction = geminiService.processReceiptImage(file);
+        
+        if (transaction != null) {
+            // 2. Tách tên Category AI tìm được
+            String[] parts = transaction.getNote().split("\\|");
+            String categoryName = parts[0];
+            String realNote = parts.length > 1 ? parts[1] : "Hóa đơn từ ảnh";
+            
+            // 3. Khớp vào Database của bạn
+            Category category = categoryRepository.findByName(categoryName)
+                    .orElseGet(() -> categoryRepository.findById(1L).orElse(null));
+            
+            transaction.setCategory(category);
+            transaction.setNote(realNote);
+            
+            // 4. Lưu xuống DB và trả về kết quả
+            return transactionRepository.save(transaction);
+        }
+        return null;
     }
 }
