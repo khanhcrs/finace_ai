@@ -1,31 +1,130 @@
 // File: src/contexts/TransactionContext.jsx
-import { createContext, useState, useContext } from 'react';
-import { Coffee, Wallet, Car, ShoppingBag } from 'lucide-react';
+import { createContext, useState, useContext, useEffect } from 'react';
+import axios from 'axios';
+import { ShoppingBag, Coffee, Car, DollarSign } from 'lucide-react';
 
-// 1. Khởi tạo Context (Cái kho)
 const TransactionContext = createContext();
 
-// 2. Tạo Provider (Người phân phối dữ liệu cho các màn hình)
-export function TransactionProvider({ children }) {
-    // Chuyển mảng dữ liệu ảo từ HomeScreen sang đây
-    const [transactions, setTransactions] = useState([
-        { id: 1, title: "Ăn sáng - Phở", date: "Hôm nay, 08:30", amount: 45000, isIncome: false, icon: Coffee },
-        { id: 2, title: "Nhận lương tháng 3", date: "Hôm qua, 15:00", amount: 5000000, isIncome: true, icon: Wallet },
-        { id: 3, title: "Đổ xăng", date: "24/03/2026", amount: 60000, isIncome: false, icon: Car },
-    ]);
+// TỪ ĐIỂN CHUYỂN ĐỔI CHỮ THÀNH ICON COMPONENT
+const ICON_MAP = {
+    'Coffee': Coffee,
+    'Car': Car,
+    'ShoppingBag': ShoppingBag,
+    'DollarSign': DollarSign,
+};
 
-    // Hàm thêm giao dịch mới
-    const addTransaction = (newTx) => {
-        // Lấy giao dịch mới nhét lên ĐẦU mảng, theo sau là copy lại các giao dịch cũ
-        setTransactions([newTx, ...transactions]);
+const savedUserId = localStorage.getItem('finance_user_id');
+const USER_ID = savedUserId ? parseInt(savedUserId) : 1;
+
+const API_TX_URL = `http://localhost:8080/api/transactions`;
+const API_GET_TX_BY_USER = `http://localhost:8080/api/transactions/user/${USER_ID}`;
+const API_GET_CAT_BY_USER = `http://localhost:8080/api/categories/user/${USER_ID}`;
+
+export function TransactionProvider({ children }) {
+    const [transactions, setTransactions] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const fetchData = async () => {
+        try {
+            setIsLoading(true);
+            const [catRes, txRes] = await Promise.all([
+                axios.get(API_GET_CAT_BY_USER),
+                axios.get(API_GET_TX_BY_USER)
+            ]);
+
+            setCategories(catRes.data);
+
+            const formattedTx = txRes.data.map(tx => ({
+                id: tx.id,
+                title: tx.note,
+                date: tx.transactionDate,
+                amount: tx.amount,
+                isIncome: tx.type === 'INCOME',
+                icon: tx.category && tx.category.icon ? ICON_MAP[tx.category.icon] : ShoppingBag,
+
+                // BẮT BUỘC PHẢI CÓ DÒNG NÀY ĐỂ THỐNG KÊ BIẾT ĐƯỜNG CHIA
+                categoryName: tx.category ? tx.category.name : 'Khác'
+            }));
+
+            setTransactions(formattedTx);
+        } catch (error) {
+            console.error("Lỗi khi tải dữ liệu:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const addTransaction = async (newTx) => {
+        try {
+            let categoryId = null;
+
+            // 1. NẾU NHẬP TỪ NÚT DẤU "+" (Có icon)
+            if (newTx.icon && typeof newTx.icon !== 'string') {
+                const iconName = newTx.icon.displayName || newTx.icon.name;
+                // Nếu tìm ra tên icon thì mới dò, không thì thôi
+                if (iconName) {
+                    const matched = categories.find(c => c.icon === iconName);
+                    if (matched) categoryId = matched.id;
+                }
+            }
+
+            // 2. NẾU AI BOT GỬI KÈM TÊN DANH MỤC
+            if (!categoryId && newTx.category) {
+                const matched = categories.find(c => c.name.toLowerCase().includes(newTx.category.toLowerCase()));
+                if (matched) categoryId = matched.id;
+            }
+
+            // 3. BOT LƯỜI KHÔNG GỬI -> QUÉT TỪ KHÓA TRONG CÂU NÓI CỦA BẠN
+            if (!categoryId && newTx.title) {
+                const titleLower = newTx.title.toLowerCase();
+                if (titleLower.includes('ăn') || titleLower.includes('uống') || titleLower.includes('phở') || titleLower.includes('sáng')) {
+                    categoryId = categories.find(c => c.name === 'Ăn uống')?.id;
+                } else if (titleLower.includes('xăng') || titleLower.includes('xe') || titleLower.includes('di chuyển')) {
+                    categoryId = categories.find(c => c.name === 'Di chuyển')?.id;
+                } else if (titleLower.includes('mua') || titleLower.includes('vé số')) {
+                    categoryId = categories.find(c => c.name === 'Mua sắm')?.id;
+                }
+            }
+
+            // 4. FALLBACK CUỐI CÙNG: Nếu vẫn mù tịt, ép nó vào danh mục đúng loại (Thu/Chi)
+            if (!categoryId) {
+                const fallbackList = categories.filter(c => c.type === (newTx.isIncome ? 'INCOME' : 'EXPENSE'));
+                categoryId = fallbackList.length > 0 ? fallbackList[0].id : categories[0].id;
+            }
+
+            if (!categoryId) {
+                alert("Lỗi: Tài khoản chưa có danh mục!");
+                return;
+            }
+
+            const dataToSend = {
+                amount: newTx.amount,
+                note: newTx.title,
+                type: newTx.isIncome ? 'INCOME' : 'EXPENSE',
+                transactionDate: new Date().toISOString().split('T')[0],
+                isAnomaly: false,
+                category: { id: categoryId },
+                user: { id: USER_ID }
+            };
+
+            await axios.post(API_TX_URL, dataToSend);
+            fetchData();
+
+        } catch (error) {
+            console.error("Lỗi khi lưu vào DB:", error);
+        }
     };
 
     return (
-        <TransactionContext.Provider value={{ transactions, addTransaction }}>
+        <TransactionContext.Provider value={{ transactions, addTransaction, isLoading }}>
             {children}
         </TransactionContext.Provider>
     );
 }
 
-// 3. Tạo Custom Hook để các Component khác gọi ra xài cho nhanh
 export const useTransaction = () => useContext(TransactionContext);
