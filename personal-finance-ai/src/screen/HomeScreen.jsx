@@ -19,47 +19,41 @@ export default function HomeScreen() {
     const balance = totalIncome - totalExpense;
 
     return (
-        <div className="min-h-screen bg-background text-gray-900 pb-20 font-sans font-medium">
+        <div className="min-h-screen text-gray-900 dark:text-gray-100 pb-20 font-sans font-medium transition-colors duration-300">
             <div className="max-w-5xl mx-auto p-5 md:p-8">
 
                 <header className="flex justify-between items-center mb-8">
                     <div>
-                        <p className="text-gray-500 text-sm font-medium">Chào buổi sáng,</p>
-                        <h1 className="text-3xl font-bold text-black">KT</h1>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm font-medium transition-colors">Chào buổi sáng,</p>
+                        <h1 className="text-3xl font-bold text-black dark:text-white transition-colors">Khánh Trần</h1>
                     </div>
-                    <div className="w-14 h-14 rounded-full bg-card border border-gray-200 flex items-center justify-center shadow-sm">
-                        <span className="text-black font-bold text-2xl">K</span>
+                    <div className="w-14 h-14 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center shadow-sm transition-colors duration-300">
+                        <span className="text-black dark:text-white font-bold text-2xl">K</span>
                     </div>
                 </header>
 
+                {/* ... (Đoạn lưới div chứa các component giữ nguyên) ... */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-6">
                         <BalanceCard balance={balance} />
                         <SummaryCards income={totalIncome} expense={totalExpense} />
                         <DashboardChart />
                     </div>
-                    <div className="lg:col-span-1 bg-card border border-gray-100 rounded-2xl p-5 shadow-sm h-fit">
+                    <div className="lg:col-span-1 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-5 shadow-sm h-fit transition-colors duration-300">
                         <TransactionList transactions={transactions} />
                     </div>
                 </div>
 
             </div>
 
-            {/* 3. Bắt sự kiện onClick đổi isModalOpen thành true */}
             <button
                 onClick={() => setIsModalOpen(true)}
-                // ĐÃ THÊM: lg:right-[352px] để né con Chatbot ra
-                className="fixed bottom-8 right-8 lg:right-[352px] w-14 h-14 bg-black text-white rounded-2xl flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all z-40"
+                className="fixed bottom-8 right-8 lg:right-[352px] w-14 h-14 bg-black dark:bg-white text-white dark:text-black rounded-2xl flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all z-40"
             >
                 <Plus size={30} strokeWidth={2.5} />
             </button>
 
-            {/* 4. Nhúng Modal vào dưới cùng. Truyền prop isOpen và hàm onClose */}
-            <AddTransactionModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-            />
-
+            <AddTransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
         </div>
     );
 }

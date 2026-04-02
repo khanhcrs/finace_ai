@@ -1,19 +1,18 @@
 // File: src/layouts/MainLayout.jsx
-import Sidebar from '../components/Sidebar.jsx';
-import ChatbotPanel from '../components/ChatbotPanel.jsx'
+import Sidebar from '../components/Sidebar';
+import ChatbotPanel from '../components/ChatbotPanel';
+
 export default function MainLayout({ children }) {
     return (
-        <div className="flex h-screen bg-[#F9FAFB] text-gray-900 overflow-hidden font-sans">
+        // Đã thêm: dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300
+        <div className="flex h-screen bg-[#F9FAFB] dark:bg-gray-950 text-gray-900 dark:text-gray-100 overflow-hidden font-sans transition-colors duration-300">
 
-            {/* Cột trái: Component Sidebar */}
             <Sidebar />
 
-            {/* Cột giữa: Nội dung thay đổi (Trang chủ, Thống kê, v.v...) */}
             <main className="flex-1 overflow-y-auto relative">
                 {children}
             </main>
 
-            {/* Cột phải: Component Chatbot */}
             <ChatbotPanel />
 
         </div>

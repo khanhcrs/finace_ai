@@ -6,9 +6,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
+
 @RestController
 @RequestMapping("/api/transactions")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "http://localhost:5173")
 public class TransactionController {
 
     @Autowired
@@ -23,6 +24,7 @@ public class TransactionController {
     public Transaction create(@RequestBody Transaction transaction) {
         return transactionService.saveTransaction(transaction);
     }
+
     @PutMapping("/{id}")
     public Transaction update(@PathVariable Long id, @RequestBody Transaction transaction) {
         return transactionService.updateTransaction(id, transaction);
@@ -32,6 +34,7 @@ public class TransactionController {
     public void delete(@PathVariable Long id) {
         transactionService.deleteTransaction(id);
     }
+
     @GetMapping("/user/{userId}/summary")
     public Map<String, Double> getSummary(@PathVariable Long userId) {
         return transactionService.getBalanceSummary(userId);

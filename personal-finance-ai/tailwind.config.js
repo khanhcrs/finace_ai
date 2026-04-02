@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class', // <--- Chỉ cần 1 dòng này là đủ pháp thuật
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -7,11 +8,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#000000',      // Đổi Vàng thành Đen làm điểm nhấn
-        background: '#F9FAFB',   // Trắng xám nhạt (nhìn dịu mắt hơn trắng tinh)
-        card: '#FFFFFF',         // Thẻ màu trắng tinh
-        income: '#16A34A',       // Xanh lá 
-        expense: '#DC2626',      // Đỏ
+        primary: '#000000',
+        background: '#F9FAFB',
+        card: '#FFFFFF',
+        income: '#16A34A',
+        expense: '#DC2626',
       }
     },
   },
