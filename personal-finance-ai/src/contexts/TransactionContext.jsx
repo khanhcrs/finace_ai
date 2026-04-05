@@ -82,11 +82,18 @@ export function TransactionProvider({ children }) {
             // 3. BOT LƯỜI KHÔNG GỬI -> QUÉT TỪ KHÓA TRONG CÂU NÓI CỦA BẠN
             if (!categoryId && newTx.title) {
                 const titleLower = newTx.title.toLowerCase();
-                if (titleLower.includes('ăn') || titleLower.includes('uống') || titleLower.includes('phở') || titleLower.includes('sáng')) {
+
+                // Khai báo cụm từ rõ ràng thay vì chữ đơn lẻ
+                const isFood = ['ăn sáng', 'ăn trưa', 'ăn tối', 'ăn phở', 'ăn uống', 'cà phê', 'cafe', 'trà sữa'].some(k => titleLower.includes(k));
+                const isTransport = ['xăng', 'xe ôm', 'grab', 'di chuyển', 'taxi'].some(k => titleLower.includes(k));
+                const isShopping = ['mua', 'vé số', 'quần áo', 'siêu thị'].some(k => titleLower.includes(k));
+
+                if (isFood) {
                     categoryId = categories.find(c => c.name === 'Ăn uống')?.id;
-                } else if (titleLower.includes('xăng') || titleLower.includes('xe') || titleLower.includes('di chuyển')) {
+                } else if (isTransport) {
                     categoryId = categories.find(c => c.name === 'Di chuyển')?.id;
-                } else if (titleLower.includes('mua') || titleLower.includes('vé số')) {
+                } else if (isShopping) {
+                    // Nếu là "mua vé số" thì vào Mua sắm
                     categoryId = categories.find(c => c.name === 'Mua sắm')?.id;
                 }
             }
@@ -121,7 +128,7 @@ export function TransactionProvider({ children }) {
     };
 
     return (
-        <TransactionContext.Provider value={{ transactions, addTransaction, isLoading }}>
+        <TransactionContext.Provider value={{ transactions, addTransaction, isLoading, fetchData }}>
             {children}
         </TransactionContext.Provider>
     );
