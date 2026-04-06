@@ -1,17 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send } from 'lucide-react';
+import { MessageSquare, Send, Check, X } from 'lucide-react';
 import axios from 'axios';
 import { useTransaction } from '../contexts/TransactionContext';
 
 export default function ChatbotPanel() {
     const { fetchData } = useTransaction();
     const userName = localStorage.getItem('finance_user_name') || 'bạn';
+    const savedUserId = localStorage.getItem('finance_user_id') || 1;
 
     const [messages, setMessages] = useState([
-        { id: 1, sender: 'ai', text: `Chào ${userName}! Mình là Trợ lý AI. Bạn muốn ghi chép hay tâm sự gì với mình hôm nay?` }
+        { id: 1, sender: 'ai', text: `Chào ${userName}! Mình là Trợ lý AI (Gemini 2.5). Bạn ghi chép hoặc hỏi mình nhé!` }
     ]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [pendingTx, setPendingTx] = useState(null);
 
     const messagesEndRef = useRef(null);
     useEffect(() => {
@@ -19,99 +21,150 @@ export default function ChatbotPanel() {
     }, [messages, isTyping]);
 
     const handleSend = async () => {
-        if (!input.trim()) return;
+        if (!input.trim() || pendingTx) return;
 
         const textToProcess = input;
-        setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'user', text: textToProcess }]);
+        setMessages(prev => [...prev, { id: Date.now(), sender: 'user', text: textToProcess }]);
         setInput('');
         setIsTyping(true);
 
         try {
-            const savedUserId = localStorage.getItem('finance_user_id') || 1;
+            const textLower = textToProcess.toLowerCase();
+            
+            // 🧠 Dạy AI nhận diện thêm nhiều từ khóa thông minh hơn
+            const isAnalyzeMode = textLower.includes("phân tích") || textLower.includes("dự đoán");
+            
+            // Thêm các từ: liệt kê, chi tiết, những gì, tại sao...
+            const isAskMode = textLower.includes("?") || 
+                              textLower.includes("bao nhiêu") || 
+                              textLower.includes("tổng") ||
+                              textLower.includes("liệt kê") ||
+                              textLower.includes("chi tiết") ||
+                              textLower.includes("gì") ||
+                              textLower.includes("nào");
 
-            const response = await axios.get(`http://localhost:8080/api/ai/process`, {
-                params: {
-                    text: textToProcess,
-                    userId: savedUserId
+            if (isAnalyzeMode) {
+                const res = await axios.get(`http://localhost:8080/api/ai/analyze`, { params: { userId: savedUserId } });
+                let aiReply = "";
+                try {
+                    let cleanData = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+                    if (cleanData && cleanData.analysis) {
+                        const adviceList = Array.isArray(cleanData.advice) ? cleanData.advice : [cleanData.advice];
+                        aiReply = `**📊 Phân tích:**\n${cleanData.analysis}\n\n**🔮 Dự đoán:**\n${cleanData.prediction}\n\n**💡 Lời khuyên:**\n- ${adviceList.join('\n- ')}`;
+                    } else {
+                        aiReply = typeof res.data === 'string' ? res.data : "Đã phân tích xong nhưng dữ liệu bị thiếu.";
+                    }
+                } catch (e) { aiReply = typeof res.data === 'string' ? res.data : "Lỗi đọc dữ liệu phân tích."; }
+                setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: aiReply }]);
+
+          } else if (isAskMode) {
+                // 🔥 CẤP TRÍ NHỚ NGẮN HẠN (Rất quan trọng)
+                // Lấy 2 tin nhắn gần nhất (ví dụ: Bạn hỏi "tổng ăn uống" -> Bot đáp "116 triệu")
+                const recentMsgs = messages.slice(-2);
+                let contextStr = "";
+                if (recentMsgs.length > 0) {
+                    contextStr = "[Ngữ cảnh cuộc trò chuyện trước đó: " + 
+                        recentMsgs.map(m => m.sender === 'user' ? `Khách: ${m.text}` : `Bot: ${m.text}`).join(" | ") + 
+                        "]. Dựa vào ngữ cảnh này, hãy trả lời câu hỏi: ";
                 }
-            });
+                
+                // Nối ngữ cảnh vào câu hỏi hiện tại của người dùng
+                const finalQuestion = contextStr + textToProcess;
 
-            // Lấy kết quả từ Backend
-            const { reply, transaction } = response.data;
+                // Gửi nguyên cục câu hỏi dài này lên API /ask
+                const res = await axios.get(`http://localhost:8080/api/ai/ask`, { 
+                    params: { text: finalQuestion, userId: savedUserId } 
+                });
+                
+                setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: String(res.data.reply || "Mình đã tìm thấy dữ liệu.") }]);
 
-            // In câu trả lời tự nhiên của AI
-            if (reply) {
-                setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'ai', text: reply }]);
             } else {
-                setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'ai', text: "Đã xử lý xong yêu cầu của bạn!" }]);
-            }
+                const res = await axios.get(`http://localhost:8080/api/ai/process`, { 
+                    params: { text: textToProcess, userId: savedUserId } 
+                });
+                const { reply, transaction, mustConfirm } = res.data;
 
-            // Cập nhật lại biểu đồ
-            if (transaction && fetchData) {
-                fetchData();
+                if (mustConfirm) {
+                    setPendingTx(transaction);
+                    setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: String(reply), isConfirmMsg: true }]);
+                } else {
+                    setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: String(reply) }]);
+                    if (fetchData) fetchData();
+                }
             }
-
         } catch (error) {
-            console.error(error);
-            const errorMsg = error.response?.data?.reply || "❌ Máy chủ AI đang bận hoặc có lỗi kết nối.";
-            setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'ai', text: errorMsg }]);
+            // 🔥 FIX: Thay vì báo máy chủ bận chung chung, lấy luôn câu chửi của Backend lên (nếu có)
+            const errorMsg = error.response?.data?.reply || "❌ Máy chủ đang bận hoặc hết hạn mức API, vui lòng thử lại sau!";
+            setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: errorMsg }]);
         } finally {
             setIsTyping(false);
         }
     };
 
+    const confirmAction = async (choice) => {
+        if (choice === 'yes' && pendingTx) {
+            setIsTyping(true);
+            try {
+                const res = await axios.post(`http://localhost:8080/api/ai/save-confirmed?userId=${savedUserId}`, pendingTx);
+                setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: String(res.data.reply) }]);
+                if (fetchData) fetchData();
+            } catch (e) {
+                setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: "❌ Lỗi khi lưu giao dịch." }]);
+            }
+        } else {
+            setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: "Đã hủy bỏ giao dịch." }]);
+        }
+        setPendingTx(null);
+        setIsTyping(false);
+    };
+
     return (
-        <aside className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col hidden lg:flex shadow-[-4px_0_24px_rgba(0,0,0,0.02)] z-10 transition-colors duration-300">
-            {/* Header */}
-            <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center space-x-3 bg-gray-50/50 dark:bg-gray-800/50 transition-colors">
-                <div className="bg-black dark:bg-white p-2 rounded-lg text-white dark:text-black transition-colors">
+        <aside className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 flex flex-col hidden lg:flex shadow-sm">
+            <div className="p-4 border-b border-gray-100 flex items-center space-x-3">
+                <div className="bg-black p-2 rounded-lg text-white">
                     <MessageSquare size={18} />
                 </div>
-                <div>
-                    <h3 className="font-bold text-sm text-gray-900 dark:text-white">Trợ lý Tài chính AI</h3>
-                    <p className="text-xs text-green-600 dark:text-green-400 font-medium flex items-center">
-                        <span className="w-2 h-2 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>
-                        Đang hoạt động
-                    </p>
-                </div>
+                <h3 className="font-bold text-sm">Trợ lý AI</h3>
             </div>
 
-            {/* Vùng Chat */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50/30 dark:bg-gray-900/50 transition-colors">
+            <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50/50">
                 {messages.map((msg) => (
                     <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] p-3 text-sm leading-relaxed transition-colors whitespace-pre-wrap ${msg.sender === 'user'
-                            ? 'bg-black dark:bg-white text-white dark:text-black rounded-2xl rounded-tr-sm'
-                            : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-2xl rounded-tl-sm shadow-sm'
-                            }`}>
-                            <span dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}></span>
+                        <div className={`max-w-[90%] p-3 text-sm rounded-2xl shadow-sm ${
+                            msg.sender === 'user' ? 'bg-black text-white rounded-tr-sm' : 
+                            msg.isConfirmMsg ? 'bg-amber-50 border border-amber-200 text-amber-900 rounded-tl-sm' :
+                            'bg-white text-gray-800 rounded-tl-sm'
+                        }`}>
+                            {/* 🔥 SỬA LỖI ĐỎ REPLACE TẠI ĐÂY (ÉP KIỂU STRING) */}
+                            <span dangerouslySetInnerHTML={{ __html: String(msg.text || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}></span>
+                            
+                            {msg.isConfirmMsg && pendingTx && (
+                                <div className="mt-4 flex gap-2 border-t border-amber-200 pt-3">
+                                    <button onClick={() => confirmAction('yes')} className="flex-1 bg-amber-600 text-white py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-amber-700">
+                                        <Check size={14} /> Xác nhận
+                                    </button>
+                                    <button onClick={() => confirmAction('no')} className="flex-1 bg-white text-amber-700 border border-amber-300 py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-amber-50">
+                                        <X size={14} /> Hủy bỏ
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}
-                {isTyping && (
-                    <div className="flex justify-start">
-                        <div className="bg-white dark:bg-gray-800 p-3 rounded-2xl shadow-sm text-gray-400 text-xs">AI đang nghĩ...</div>
-                    </div>
-                )}
+                {isTyping && <div className="text-gray-400 text-xs italic">AI đang xử lý...</div>}
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
-            <div className="p-4 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 transition-colors">
+            <div className="p-4 bg-white border-t border-gray-100">
                 <div className="relative">
                     <input
-                        type="text"
-                        value={input}
+                        type="text" value={input} disabled={pendingTx || isTyping}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        placeholder="Thử gõ: Mới đi cà phê hết 50k..."
-                        className="w-full bg-gray-100 dark:bg-gray-800 rounded-xl py-3 pl-4 pr-12 text-sm text-gray-900 dark:text-white outline-none"
+                        placeholder="Nhập thu chi..."
+                        className="w-full bg-gray-100 rounded-xl py-3 pl-4 pr-12 text-sm outline-none"
                     />
-                    <button
-                        onClick={handleSend}
-                        disabled={!input.trim() || isTyping}
-                        className="absolute right-2 top-2 p-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg disabled:opacity-50"
-                    >
+                    <button onClick={handleSend} disabled={!input.trim() || isTyping || pendingTx} className="absolute right-2 top-2 p-1.5 bg-black text-white rounded-lg disabled:opacity-30">
                         <Send size={16} />
                     </button>
                 </div>

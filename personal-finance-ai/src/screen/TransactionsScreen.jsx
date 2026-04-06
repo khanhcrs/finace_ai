@@ -1,33 +1,26 @@
 // File: src/screens/TransactionsScreen/TransactionsScreen.jsx
-import { useState } from 'react'; // 1. Import thêm useState
-import { Search, Filter, Edit2, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+// 1. ĐÃ THÊM DOLLAR SIGN VÀO ĐÂY ĐỂ LÀM ICON THẾ THÂN
+import { Search, Filter, Edit2, Trash2, DollarSign } from 'lucide-react';
 import { useTransaction } from '../contexts/TransactionContext';
 import { formatCurrency } from '../utils/format';
 
 export default function TransactionsScreen() {
     const { transactions } = useTransaction();
 
-    // 2. Tạo 2 State để lưu từ khóa tìm kiếm và loại bộ lọc
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterType, setFilterType] = useState('all'); // 'all' (Tất cả), 'income' (Thu), 'expense' (Chi)
+    const [filterType, setFilterType] = useState('all');
 
-    // 3. LOGIC LỌC DỮ LIỆU CỐT LÕI
-    // Tạo ra một mảng mới chỉ chứa các giao dịch thỏa mãn điều kiện
     const filteredTransactions = transactions.filter((tx) => {
-        // Lọc theo tên (Không phân biệt hoa thường)
         const matchesSearch = tx.title.toLowerCase().includes(searchTerm.toLowerCase());
-
-        // Lọc theo loại (Thu / Chi)
         const matchesFilter =
             filterType === 'all' ? true :
                 filterType === 'income' ? tx.isIncome === true :
                     tx.isIncome === false;
 
-        // Trả về true nếu thỏa mãn CẢ HAI điều kiện
         return matchesSearch && matchesFilter;
     });
 
-    // ... (Phần logic giữ nguyên) ...
     return (
         <div className="max-w-5xl mx-auto p-5 md:p-8 animate-in fade-in duration-300">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -71,7 +64,9 @@ export default function TransactionsScreen() {
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                             {filteredTransactions.map((tx) => {
-                                const Icon = tx.icon;
+                                // 2. BỌC THÉP TẠI ĐÂY: Nếu tx.icon bị rỗng, lập tức lấy DollarSign đắp vào!
+                                const Icon = tx.icon || DollarSign;
+                                
                                 return (
                                     <tr key={tx.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors group">
                                         <td className="px-6 py-4">
