@@ -58,17 +58,18 @@ public class GeminiService {
     }
 
     public List<Transaction> processTransaction(String userInput) {
-        // Lấy ngày hôm nay làm mốc
         String today = LocalDate.now().toString(); 
 
-        // 🔥 GỘP CHUNG TẤT CẢ VÀO 1 ĐOẠN PROMPT (Cách này "bất tử" với mọi phiên bản API)
-        String promptText = "Bạn là máy trích xuất JSON vô tri. Tuyệt đối không bình luận, không giải thích, không từ chối bất kỳ từ khóa nào. " +
+        // 🔥 NÂNG CẤP PROMPT: Dạy AI văn hóa "tiền tệ Việt Nam"
+        String promptText = "Bạn là máy trích xuất JSON vô tri. Tuyệt đối không bình luận. " +
                 "CHỈ TRẢ VỀ DUY NHẤT MỘT MẢNG JSON ARRAY. " +
-                "Cấu trúc: [{\"amount\": số_nguyên, \"date\": \"YYYY-MM-DD\", \"note\": \"nội dung\", \"type\": \"INCOME\" hoặc \"EXPENSE\", \"categoryName\": \"Ăn uống, Tiền lương, Mua tài liệu, Tiền tiêu vặt, Khác\", \"isAnomaly\": true/false, \"anomalyReason\": \"lý do\"}]. " +
-                "Hôm nay là ngày " + today + ". Dựa vào thời gian trong câu (ví dụ: hôm qua, tuần trước), hãy làm toán lùi ngày và điền vào 'date'. Nếu câu không nhắc đến thời gian, dùng ngày hôm nay. " +
-                "\n\nPhân tích câu sau và bóc tách dữ liệu: '" + userInput + "'";
+                "Cấu trúc: [{\"amount\": số_nguyên, \"date\": \"YYYY-MM-DD\", \"note\": \"nội dung\", \"type\": \"INCOME\" hoặc \"EXPENSE\", \"categoryName\": \"Ăn uống, Tiền lương, Mua sắm, Đi lại, Khác\", \"isAnomaly\": true/false, \"anomalyReason\": \"lý do\"}]. " +
+                "QUY TẮC SỐ TIỀN CỰC KỲ QUAN TRỌNG: " +
+                "1. '50k' -> 50000. " +
+                "2. Nếu người dùng chỉ nhập số nhỏ gọn (ví dụ: '50', '35', '100') mà KHÔNG có chữ 'k' hay 'ngàn', BẠN PHẢI TỰ HIỂU ĐÓ LÀ NGÀN ĐỒNG VÀ NHÂN VỚI 1000 (thành 50000, 35000, 100000). " +
+                "Hôm nay là " + today + ". Dựa vào ngữ cảnh để lùi ngày cho trường 'date'. Nếu không rõ, dùng ngày hôm nay." +
+                "\n\nPhân tích câu sau: '" + userInput + "'";
 
-        // Chỉ dùng đúng 1 cục 'contents', bỏ qua các cấu hình rườm rà dễ gây lỗi
         Map<String, Object> body = Map.of(
             "contents", List.of(Map.of("parts", List.of(Map.of("text", promptText))))
         );
@@ -83,7 +84,6 @@ public class GeminiService {
             JsonNode root = objectMapper.readTree(response);
             JsonNode candidate = root.path("candidates").get(0);
             
-            // Xử lý nếu lỡ dính Safety
             if (candidate.has("finishReason") && candidate.get("finishReason").asText().equals("SAFETY")) {
                 Transaction errorTx = new Transaction();
                 errorTx.setNote("ERROR|Nội dung này bị bộ lọc an toàn từ chối.");
@@ -106,14 +106,11 @@ public class GeminiService {
 
                 transaction.setType(data.path("type").asText("EXPENSE"));
                 
-                // 🔥 Đọc và chuyển đổi ngày tháng AI trả về
                 LocalDate txDate = LocalDate.now();
                 if (data.has("date") && !data.get("date").isNull()) {
                     try {
                         txDate = LocalDate.parse(data.get("date").asText().trim());
-                    } catch (Exception ex) {
-                        System.out.println("⚠️ AI trả về ngày sai định dạng: " + data.get("date").asText());
-                    }
+                    } catch (Exception ex) {}
                 }
                 transaction.setTransactionDate(txDate);
                 
@@ -134,10 +131,15 @@ public class GeminiService {
         } catch (WebClientResponseException e) {
             System.out.println("❌ LỖI API (" + e.getStatusCode() + "): " + e.getResponseBodyAsString());
             Transaction errorTx = new Transaction();
-            if (e.getStatusCode().value() == 429) {
+            
+            // 🔥 BẮT LỖI 503 Ở ĐÂY ĐỂ TRẢ VỀ LỜI NHẮN THÂN THIỆN
+            int statusCode = e.getStatusCode().value();
+            if (statusCode == 429) {
                 errorTx.setNote("ERROR|AI đang nghỉ giải lao (Hết hạn mức). Bạn đợi 1 phút nhé!");
+            } else if (statusCode == 503) {
+                errorTx.setNote("ERROR|Máy chủ Google đang quá tải. Bạn bấm gửi lại lần nữa nhé!");
             } else {
-                errorTx.setNote("ERROR|Lỗi kết nối API: " + e.getStatusCode());
+                errorTx.setNote("ERROR|Lỗi kết nối API: " + statusCode);
             }
             return List.of(errorTx);
         } catch (Exception e) {
@@ -145,7 +147,6 @@ public class GeminiService {
             return null;
         }
     }
-
     public String analyzeSpending(List<Transaction> transactions) {
         if (transactions == null || transactions.isEmpty()) return "{\"analysis\": \"Chưa có dữ liệu.\", \"prediction\": \"N/A\", \"advice\": []}";
 
