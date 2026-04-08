@@ -79,12 +79,12 @@ public class GeminiService {
                 "\n\nPhân tích câu sau: '" + userInput + "'";
 
         Map<String, Object> body = Map.of(
-                "contents", List.of(Map.of("parts", List.of(Map.of("text", promptText)))));
+            "contents", List.of(Map.of("parts", List.of(Map.of("text", promptText))))
+        );
 
         try {
             String response = webClient.post()
-                    .uri(uriBuilder -> uriBuilder.path("/v1beta/models/gemini-2.5-flash:generateContent")
-                            .queryParam("key", apiKey).build())
+                    .uri(uriBuilder -> uriBuilder.path("/v1beta/models/gemini-2.5-flash:generateContent").queryParam("key", apiKey).build())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(body)
                     .retrieve().bodyToMono(String.class).block();
@@ -179,8 +179,7 @@ public class GeminiService {
 
         try {
             String response = webClient.post()
-                    .uri(uriBuilder -> uriBuilder.path("/v1beta/models/gemini-2.5-flash:generateContent")
-                            .queryParam("key", apiKey).build())
+                    .uri(uriBuilder -> uriBuilder.path("/v1beta/models/gemini-2.5-flash:generateContent").queryParam("key", apiKey).build())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(body)
                     .retrieve().bodyToMono(String.class).block();
