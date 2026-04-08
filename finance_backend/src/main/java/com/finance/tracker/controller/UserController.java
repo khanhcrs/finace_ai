@@ -16,6 +16,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/users")
 @CrossOrigin(origins = "http://localhost:5173")
+
 public class UserController {
 
     @Autowired
@@ -77,5 +78,33 @@ public class UserController {
 
         // Nếu sai thì báo lỗi 401 Unauthorized
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sai email hoặc mật khẩu!");
+    }
+
+    // 3. LẤY THÔNG TIN CHI TIẾT USER
+    @GetMapping("/{id}")
+    public ResponseEntity<User> getUser(@PathVariable Long id) {
+        return userService.getUserById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // 4. CẬP NHẬT NGƯỠNG CHI TIÊU
+    @PutMapping("/{id}/thresholds")
+    public ResponseEntity<?> updateThresholds(@PathVariable Long id, @RequestBody Map<String, Double> thresholds) {
+        Optional<User> userOpt = userService.getUserById(id);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            if (thresholds.containsKey("thresholdEating"))
+                user.setThresholdEating(thresholds.get("thresholdEating"));
+            if (thresholds.containsKey("thresholdShopping"))
+                user.setThresholdShopping(thresholds.get("thresholdShopping"));
+            if (thresholds.containsKey("thresholdTransport"))
+                user.setThresholdTransport(thresholds.get("thresholdTransport"));
+            if (thresholds.containsKey("thresholdOthers"))
+                user.setThresholdOthers(thresholds.get("thresholdOthers"));
+
+            return ResponseEntity.ok(userService.saveUser(user));
+        }
+        return ResponseEntity.notFound().build();
     }
 }

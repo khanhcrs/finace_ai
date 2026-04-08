@@ -1,16 +1,35 @@
-# React + Vite
+# Personal Finance AI - 💻 Ứng dụng Quản lý Tài chính (Web Dashboard)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Dự án Dashboard quản lý tài chính tích hợp AI được xây dựng bằng **React (Vite)**, **Tailwind CSS** và **Lucide Icons**.
 
-Currently, two official plugins are available:
+## 🚀 Hướng dẫn cài đặt cho bạn bè khi Pull về
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Để chạy Dashboard này trên máy tính của bạn:
 
-## React Compiler
+### 1. Cài đặt thư viện
+Sau khi pull code về, mở terminal tại thư mục `personal-finance-ai` và chạy lệnh:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+```
+Lệnh này sẽ tự động tải tất cả các thư viện cần thiết như `lucide-react`, `recharts`, `axios`, `react-hot-toast`, `tailwind-merge`, v.v.
 
-## Expanding the ESLint configuration
+### 2. Chạy ứng dụng (Chế độ Dev)
+Dùng lệnh sau để khởi động web ở chế độ phát triển:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm run dev
+```
+Sau đó truy cập đường dẫn được hiển thị trên terminal (thường là `http://localhost:5173`).
+
+### 3. Lưu ý về Backend
+Đảm bảo bạn đã chạy **Backend Spring Boot** tại địa chỉ `http://localhost:8080` để dữ liệu có thể hiển thị được trên Dashboard.
+
+---
+## 🛠 Các thư viện chính sử dụng
+- **Vite + React**: Nền tảng xây dựng ứng dụng nhanh.
+- **Tailwind CSS**: Framework CSS hiện đại để thiết kế giao diện nhanh chóng.
+- **Lucide Icons**: Bộ icon tinh tế.
+- **Recharts**: Thư viện biểu đồ mạnh mẽ.
+- **Axios**: Gửi yêu cầu HTTP đến Backend.
+- **React Hot Toast**: Hiển thị thông báo (toast notification) chuyên nghiệp.

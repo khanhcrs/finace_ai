@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, ShoppingBag, Coffee, Car, DollarSign } from 'lucide-react';
 import { useTransaction } from '../contexts/TransactionContext';
+import { toast } from 'react-hot-toast';
 
 export default function AddTransactionModal({ isOpen, onClose }) {
     const { addTransaction } = useTransaction();
@@ -10,6 +11,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
     const [amount, setAmount] = useState('');
     const [title, setTitle] = useState('');
     const [category, setCategory] = useState('Coffee'); // Mặc định chọn icon Coffee
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Danh sách Category để render ra UI cho người dùng chọn
     const CATEGORIES = [
@@ -23,29 +25,43 @@ export default function AddTransactionModal({ isOpen, onClose }) {
     const filteredCategories = CATEGORIES.filter(c => c.type === type);
 
     // Xử lý khi bấm nút "Lưu giao dịch"
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!amount || !title) return;
+        if (!amount || !title || isSubmitting) return;
 
-        // Tìm icon component tương ứng với category người dùng chọn
-        const selectedCat = CATEGORIES.find(c => c.id === category);
+        setIsSubmitting(true);
+        const loadingToast = toast.loading('Đang lưu giao dịch...');
 
-        // Tạo object giao dịch mới để gửi xuống Context
-        const newTx = {
-            title: title,
-            amount: parseInt(amount.replace(/\D/g, '')), // Ép kiểu số nguyên
-            isIncome: type === 'income',
-            icon: selectedCat ? selectedCat.icon : ShoppingBag
-        };
+        try {
+            // Tìm icon component tương ứng với category người dùng chọn
+            const selectedCat = CATEGORIES.find(c => c.id === category);
 
-        // Gọi hàm addTransaction từ Context
-        addTransaction(newTx);
+            // Tạo object giao dịch mới để gửi xuống Context
+            const newTx = {
+                title: title,
+                amount: parseInt(amount.replace(/\D/g, '')), // Ép kiểu số nguyên
+                isIncome: type === 'income',
+                icon: selectedCat ? selectedCat.icon : ShoppingBag
+            };
 
-        // Reset form và đóng modal
-        setAmount('');
-        setTitle('');
-        setType('expense');
-        onClose();
+            // Gọi hàm addTransaction từ Context
+            const success = await addTransaction(newTx);
+
+            if (success) {
+                toast.success('Thêm giao dịch thành công!', { id: loadingToast });
+                // Reset form và đóng modal
+                setAmount('');
+                setTitle('');
+                setType('expense');
+                onClose();
+            } else {
+                toast.error('Thêm giao dịch thất bại. Vui lòng thử lại!', { id: loadingToast });
+            }
+        } catch (error) {
+            toast.error('Có lỗi xảy ra!', { id: loadingToast });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     // Format số tiền khi đang gõ (VD: 50000 -> 50.000)
@@ -69,7 +85,8 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">Thêm giao dịch</h2>
                     <button
                         onClick={onClose}
-                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                        disabled={isSubmitting}
+                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors disabled:opacity-50"
                     >
                         <X size={20} />
                     </button>
@@ -82,6 +99,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                     <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
                         <button
                             type="button"
+                            disabled={isSubmitting}
                             onClick={() => { setType('expense'); setCategory('Coffee'); }} // Chuyển tab thì reset category
                             className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${type === 'expense' ? 'bg-white dark:bg-gray-700 text-expense shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
                         >
@@ -89,6 +107,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                         </button>
                         <button
                             type="button"
+                            disabled={isSubmitting}
                             onClick={() => { setType('income'); setCategory('DollarSign'); }}
                             className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${type === 'income' ? 'bg-white dark:bg-gray-700 text-income shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
                         >
@@ -103,10 +122,11 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                             <input
                                 type="text"
                                 required
+                                disabled={isSubmitting}
                                 value={amount}
                                 onChange={handleAmountChange}
                                 placeholder="0"
-                                className={`w-full bg-gray-50 dark:bg-gray-800/50 border ${type === 'expense' ? 'focus:border-expense focus:ring-expense/20' : 'focus:border-income focus:ring-income/20'} rounded-2xl py-4 pl-4 pr-12 text-2xl font-black text-gray-900 dark:text-white outline-none transition-all placeholder-gray-300 dark:placeholder-gray-600`}
+                                className={`w-full bg-gray-50 dark:bg-gray-800/50 border ${type === 'expense' ? 'focus:border-expense focus:ring-expense/20' : 'focus:border-income focus:ring-income/20'} rounded-2xl py-4 pl-4 pr-12 text-2xl font-black text-gray-900 dark:text-white outline-none transition-all placeholder-gray-300 dark:placeholder-gray-600 disabled:opacity-50`}
                             />
                             <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">đ</span>
                         </div>
@@ -119,18 +139,20 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                             <input
                                 type="text"
                                 required
+                                disabled={isSubmitting}
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
                                 placeholder="VD: Ăn sáng..."
-                                className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl py-3 px-4 text-sm font-medium text-gray-900 dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black outline-none transition-all placeholder-gray-400"
+                                className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl py-3 px-4 text-sm font-medium text-gray-900 dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black outline-none transition-all placeholder-gray-400 disabled:opacity-50"
                             />
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Danh mục</label>
                             <select
                                 value={category}
+                                disabled={isSubmitting}
                                 onChange={(e) => setCategory(e.target.value)}
-                                className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl py-3 px-4 text-sm font-medium text-gray-900 dark:text-white focus:border-black dark:focus:border-white outline-none transition-all appearance-none cursor-pointer"
+                                className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl py-3 px-4 text-sm font-medium text-gray-900 dark:text-white focus:border-black dark:focus:border-white outline-none transition-all appearance-none cursor-pointer disabled:opacity-50"
                             >
                                 {filteredCategories.map(c => (
                                     <option key={c.id} value={c.id}>{c.name}</option>
@@ -142,9 +164,10 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                     {/* Nút Submit */}
                     <button
                         type="submit"
-                        className={`w-full font-bold text-white py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all mt-4 ${type === 'expense' ? 'bg-expense hover:bg-red-700' : 'bg-income hover:bg-green-700'}`}
+                        disabled={isSubmitting}
+                        className={`w-full font-bold text-white py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all mt-4 disabled:opacity-50 disabled:cursor-not-allowed ${type === 'expense' ? 'bg-expense hover:bg-red-700' : 'bg-income hover:bg-green-700'}`}
                     >
-                        Lưu giao dịch
+                        {isSubmitting ? 'Đang lưu...' : 'Lưu giao dịch'}
                     </button>
 
                 </form>

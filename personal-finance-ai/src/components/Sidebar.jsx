@@ -13,6 +13,8 @@ export default function Sidebar() {
     };
 
     const handleLogout = () => {
+        localStorage.removeItem('finance_user_id');
+        localStorage.removeItem('finance_user_name');
         navigate('/login');
     };
 
