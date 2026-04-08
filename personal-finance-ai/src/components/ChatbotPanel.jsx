@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, Check, X } from 'lucide-react';
+import { MessageSquare, Send, Image as ImageIcon, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { useTransaction } from '../contexts/TransactionContext';
+import { toast } from 'react-hot-toast';
 
 export default function ChatbotPanel() {
     const { fetchData } = useTransaction();
@@ -13,83 +14,74 @@ export default function ChatbotPanel() {
     ]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
-    const [pendingTx, setPendingTx] = useState(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [pendingTransaction, setPendingTransaction] = useState(null);
 
     const messagesEndRef = useRef(null);
+    const fileInputRef = useRef(null);
+
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, isTyping]);
+    }, [messages, isTyping, isUploading]);
 
     const handleSend = async () => {
         if (!input.trim() || pendingTx) return;
 
-        const textToProcess = input;
-        setMessages(prev => [...prev, { id: Date.now(), sender: 'user', text: textToProcess }]);
+        const textToProcess = input.trim();
+        const lowerInput = textToProcess.toLowerCase();
+        const savedUserId = localStorage.getItem('finance_user_id') || 1;
+
+        setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'user', text: textToProcess }]);
         setInput('');
         setIsTyping(true);
 
         try {
-            const textLower = textToProcess.toLowerCase();
-            
-            // 🧠 Dạy AI nhận diện thêm nhiều từ khóa thông minh hơn
-            const isAnalyzeMode = textLower.includes("phân tích") || textLower.includes("dự đoán");
-            
-            // Thêm các từ: liệt kê, chi tiết, những gì, tại sao...
-            const isAskMode = textLower.includes("?") || 
-                              textLower.includes("bao nhiêu") || 
-                              textLower.includes("tổng") ||
-                              textLower.includes("liệt kê") ||
-                              textLower.includes("chi tiết") ||
-                              textLower.includes("gì") ||
-                              textLower.includes("nào");
+            // 1. XỬ LÝ XÁC NHẬN LƯU GIAO DỊCH BẤT THƯỜNG
+            if (pendingTransaction && (
+                lowerInput.includes('rồi') || 
+                lowerInput.includes('ok') || 
+                lowerInput.includes('lưu') || 
+                lowerInput.includes('đúng') ||
+                lowerInput.includes('có')
+            )) {
+                const confirmRes = await axios.post(`http://localhost:8080/api/ai/save-confirmed?userId=${savedUserId}`, pendingTransaction);
+                setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'ai', text: confirmRes.data.reply }]);
+                setPendingTransaction(null);
+                if (fetchData) fetchData();
+                toast.success("Đã lưu giao dịch!");
+                return;
+            }
 
-            if (isAnalyzeMode) {
-                const res = await axios.get(`http://localhost:8080/api/ai/analyze`, { params: { userId: savedUserId } });
-                let aiReply = "";
-                try {
-                    let cleanData = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
-                    if (cleanData && cleanData.analysis) {
-                        const adviceList = Array.isArray(cleanData.advice) ? cleanData.advice : [cleanData.advice];
-                        aiReply = `**📊 Phân tích:**\n${cleanData.analysis}\n\n**🔮 Dự đoán:**\n${cleanData.prediction}\n\n**💡 Lời khuyên:**\n- ${adviceList.join('\n- ')}`;
-                    } else {
-                        aiReply = typeof res.data === 'string' ? res.data : "Đã phân tích xong nhưng dữ liệu bị thiếu.";
-                    }
-                } catch (e) { aiReply = typeof res.data === 'string' ? res.data : "Lỗi đọc dữ liệu phân tích."; }
-                setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: aiReply }]);
-
-          } else if (isAskMode) {
-                // 🔥 CẤP TRÍ NHỚ NGẮN HẠN (Rất quan trọng)
-                // Lấy 2 tin nhắn gần nhất (ví dụ: Bạn hỏi "tổng ăn uống" -> Bot đáp "116 triệu")
-                const recentMsgs = messages.slice(-2);
-                let contextStr = "";
-                if (recentMsgs.length > 0) {
-                    contextStr = "[Ngữ cảnh cuộc trò chuyện trước đó: " + 
-                        recentMsgs.map(m => m.sender === 'user' ? `Khách: ${m.text}` : `Bot: ${m.text}`).join(" | ") + 
-                        "]. Dựa vào ngữ cảnh này, hãy trả lời câu hỏi: ";
-                }
-                
-                // Nối ngữ cảnh vào câu hỏi hiện tại của người dùng
-                const finalQuestion = contextStr + textToProcess;
-
-                // Gửi nguyên cục câu hỏi dài này lên API /ask
-                const res = await axios.get(`http://localhost:8080/api/ai/ask`, { 
-                    params: { text: finalQuestion, userId: savedUserId } 
+            // 2. THỬ XỬ LÝ NHƯ MỘT GIAO DỊCH MỚI
+            try {
+                const response = await axios.get(`http://localhost:8080/api/ai/process`, {
+                    params: { text: textToProcess, userId: savedUserId }
                 });
-                
-                setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: String(res.data.reply || "Mình đã tìm thấy dữ liệu.") }]);
 
-            } else {
-                const res = await axios.get(`http://localhost:8080/api/ai/process`, { 
-                    params: { text: textToProcess, userId: savedUserId } 
-                });
-                const { reply, transaction, mustConfirm } = res.data;
+                const { reply, transaction, mustConfirm } = response.data;
 
                 if (mustConfirm) {
-                    setPendingTx(transaction);
-                    setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: String(reply), isConfirmMsg: true }]);
+                    setPendingTransaction(transaction);
                 } else {
-                    setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: String(reply) }]);
-                    if (fetchData) fetchData();
+                    setPendingTransaction(null);
+                }
+
+                setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'ai', text: reply }]);
+                
+                if (transaction && !mustConfirm && fetchData) {
+                    fetchData();
+                    toast.success("Đã ghi chép!");
+                }
+            } catch (err) {
+                // 3. NẾU KHÔNG PHẢI GIAO DỊCH (LỖI 400), CHUYỂN SANG HỎI ĐÁP/TÂM SỰ
+                if (err.response && err.response.status === 400) {
+                    const askRes = await axios.get(`http://localhost:8080/api/ai/ask`, {
+                        params: { text: textToProcess, userId: savedUserId }
+                    });
+                    setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'ai', text: askRes.data.reply }]);
+                    setPendingTransaction(null);
+                } else {
+                    throw err;
                 }
             }
         } catch (error) {
@@ -101,21 +93,51 @@ export default function ChatbotPanel() {
         }
     };
 
-    const confirmAction = async (choice) => {
-        if (choice === 'yes' && pendingTx) {
-            setIsTyping(true);
-            try {
-                const res = await axios.post(`http://localhost:8080/api/ai/save-confirmed?userId=${savedUserId}`, pendingTx);
-                setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: String(res.data.reply) }]);
-                if (fetchData) fetchData();
-            } catch (e) {
-                setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: "❌ Lỗi khi lưu giao dịch." }]);
-            }
-        } else {
-            setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: "Đã hủy bỏ giao dịch." }]);
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Giới hạn kích thước file (ví dụ: 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("Ảnh quá lớn! Vui lòng chọn ảnh dưới 5MB.");
+            return;
         }
-        setPendingTx(null);
-        setIsTyping(false);
+
+        setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'user', text: "📷 [Đã gửi một ảnh hóa đơn]" }]);
+        setIsUploading(true);
+
+        const formData = new FormData();
+        formData.append('file', file);
+        const savedUserId = localStorage.getItem('finance_user_id') || 1;
+        formData.append('userId', savedUserId);
+
+        try {
+            const response = await axios.post(`http://localhost:8080/api/ai/process-receipt`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
+            const transaction = response.data;
+            if (transaction) {
+                const amountFormatted = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(transaction.amount);
+                setMessages((prev) => [...prev, { 
+                    id: Date.now() + Math.random(), 
+                    sender: 'ai', 
+                    text: `✅ Mình đã đọc xong hóa đơn!\n\n**Nội dung:** ${transaction.note}\n**Số tiền:** ${amountFormatted}\n**Danh mục:** ${transaction.category?.name || 'Khác'}\n\nĐã lưu vào lịch sử giao dịch của bạn.` 
+                }]);
+                
+                if (fetchData) fetchData();
+                toast.success("Phân tích hóa đơn thành công!");
+            }
+        } catch (error) {
+            console.error(error);
+            setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'ai', text: "❌ Xin lỗi, mình không thể đọc được hóa đơn này. Bạn hãy thử chụp rõ hơn nhé!" }]);
+            toast.error("Lỗi khi xử lý hóa đơn.");
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
     };
 
     return (
@@ -151,22 +173,52 @@ export default function ChatbotPanel() {
                         </div>
                     </div>
                 ))}
-                {isTyping && <div className="text-gray-400 text-xs italic">AI đang xử lý...</div>}
+                {(isTyping || isUploading) && (
+                    <div className="flex justify-start">
+                        <div className="bg-white dark:bg-gray-800 p-3 rounded-2xl shadow-sm text-gray-400 text-xs flex items-center">
+                            <Loader2 size={14} className="animate-spin mr-2" />
+                            {isUploading ? "AI đang phân tích ảnh..." : "AI đang nghĩ..."}
+                        </div>
+                    </div>
+                )}
                 <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-4 bg-white border-t border-gray-100">
-                <div className="relative">
+            {/* Input */}
+            <div className="p-4 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 transition-colors">
+                <div className="flex items-center space-x-2">
                     <input
-                        type="text" value={input} disabled={pendingTx || isTyping}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        placeholder="Nhập thu chi..."
-                        className="w-full bg-gray-100 rounded-xl py-3 pl-4 pr-12 text-sm outline-none"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        ref={fileInputRef}
+                        onChange={handleImageUpload}
                     />
-                    <button onClick={handleSend} disabled={!input.trim() || isTyping || pendingTx} className="absolute right-2 top-2 p-1.5 bg-black text-white rounded-lg disabled:opacity-30">
-                        <Send size={16} />
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isTyping || isUploading}
+                        className="p-2.5 text-gray-500 hover:text-black dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all disabled:opacity-50"
+                        title="Tải lên hóa đơn"
+                    >
+                        <ImageIcon size={20} />
                     </button>
+                    <div className="relative flex-1">
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                            placeholder="Nhập nội dung..."
+                            className="w-full bg-gray-100 dark:bg-gray-800 rounded-xl py-3 pl-4 pr-10 text-sm text-gray-900 dark:text-white outline-none"
+                        />
+                        <button
+                            onClick={handleSend}
+                            disabled={!input.trim() || isTyping || isUploading}
+                            className="absolute right-2 top-1.5 p-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg disabled:opacity-50"
+                        >
+                            <Send size={16} />
+                        </button>
+                    </div>
                 </div>
             </div>
         </aside>

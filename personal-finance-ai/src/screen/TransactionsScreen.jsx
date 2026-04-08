@@ -4,22 +4,46 @@ import { useState } from 'react';
 import { Search, Filter, Edit2, Trash2, DollarSign } from 'lucide-react';
 import { useTransaction } from '../contexts/TransactionContext';
 import { formatCurrency } from '../utils/format';
+import { toast } from 'react-hot-toast';
+import EditTransactionModal from '../components/EditTransactionModal';
 
 export default function TransactionsScreen() {
-    const { transactions } = useTransaction();
+    const { transactions, deleteTransaction } = useTransaction();
 
+    // State cho tìm kiếm và lọc
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterType, setFilterType] = useState('all');
+    const [filterType, setFilterType] = useState('all'); // 'all', 'income', 'expense'
 
+    // State cho Modal sửa
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedTx, setSelectedTx] = useState(null);
+
+    // LOGIC LỌC DỮ LIỆU
     const filteredTransactions = transactions.filter((tx) => {
         const matchesSearch = tx.title.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesFilter =
             filterType === 'all' ? true :
                 filterType === 'income' ? tx.isIncome === true :
                     tx.isIncome === false;
-
         return matchesSearch && matchesFilter;
     });
+
+    const handleEdit = (tx) => {
+        setSelectedTx(tx);
+        setIsEditModalOpen(true);
+    };
+
+    const handleDelete = async (id) => {
+        if (window.confirm("Bạn có chắc chắn muốn xóa giao dịch này không?")) {
+            const loadingToast = toast.loading("Đang xóa...");
+            const success = await deleteTransaction(id);
+            if (success) {
+                toast.success("Đã xóa giao dịch!", { id: loadingToast });
+            } else {
+                toast.error("Xóa thất bại!", { id: loadingToast });
+            }
+        }
+    };
 
     return (
         <div className="max-w-5xl mx-auto p-5 md:p-8 animate-in fade-in duration-300">
@@ -80,7 +104,7 @@ export default function TransactionsScreen() {
                                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{tx.date}</td>
                                         <td className="px-6 py-4">
                                             <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${tx.isIncome ? 'bg-income/10 text-income' : 'bg-expense/10 text-expense'}`}>
-                                                {tx.isIncome ? 'Khoản thu' : 'Khoản chi'}
+                                                {tx.categoryName || (tx.isIncome ? 'Khoản thu' : 'Khoản chi')}
                                             </span>
                                         </td>
                                         <td className={`px-6 py-4 text-right font-bold ${tx.isIncome ? 'text-income' : 'text-expense'}`}>
@@ -88,8 +112,18 @@ export default function TransactionsScreen() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center justify-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"><Edit2 size={18} /></button>
-                                                <button className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"><Trash2 size={18} /></button>
+                                                <button 
+                                                    onClick={() => handleEdit(tx)}
+                                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                                                >
+                                                    <Edit2 size={18} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDelete(tx.id)}
+                                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -104,6 +138,13 @@ export default function TransactionsScreen() {
                     )}
                 </div>
             </div>
+
+            {/* Modal chỉnh sửa */}
+            <EditTransactionModal 
+                isOpen={isEditModalOpen} 
+                onClose={() => setIsEditModalOpen(false)} 
+                transaction={selectedTx} 
+            />
         </div>
     );
 }

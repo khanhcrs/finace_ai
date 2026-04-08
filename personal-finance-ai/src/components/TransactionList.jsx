@@ -12,6 +12,7 @@ export default function TransactionList({ transactions }) {
                 <button className="text-gray-500 dark:text-gray-400 font-medium text-sm hover:underline">Xem tất cả</button>
             </div>
 
+
             <div className="space-y-3">
                 {transactions.map((tx) => {
                     // 2. KIỂM TRA ICON: Nếu tx.icon bị undefined, dùng CircleDollarSign thay thế

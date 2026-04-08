@@ -10,6 +10,19 @@ import DashboardChart from '../components/DashboardChart';
 
 export default function HomeScreen() {
     const [isModalOpen, setIsModalOpen] = useState(false);
+    
+    // Lấy tên người dùng từ localStorage
+    const userName = localStorage.getItem('finance_user_name') || 'Khách';
+    const firstLetter = userName.charAt(0).toUpperCase();
+
+    // Hàm lấy lời chào theo thời gian thực
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 11) return "Chào buổi sáng,";
+        if (hour >= 11 && hour < 14) return "Chào buổi trưa,";
+        if (hour >= 14 && hour < 18) return "Chào buổi chiều,";
+        return "Chào buổi tối,";
+    };
 
     // MÓC DỮ LIỆU TỪ KHO RA (Thay vì tự khai báo như trước)
     const { transactions } = useTransaction();
@@ -24,11 +37,11 @@ export default function HomeScreen() {
 
                 <header className="flex justify-between items-center mb-8">
                     <div>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm font-medium transition-colors">Chào buổi sáng,</p>
-                        <h1 className="text-3xl font-bold text-black dark:text-white transition-colors">Khánh Trần</h1>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm font-medium transition-colors">{getGreeting()}</p>
+                        <h1 className="text-3xl font-bold text-black dark:text-white transition-colors">{userName}</h1>
                     </div>
                     <div className="w-14 h-14 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center shadow-sm transition-colors duration-300">
-                        <span className="text-black dark:text-white font-bold text-2xl">K</span>
+                        <span className="text-black dark:text-white font-bold text-2xl">{firstLetter}</span>
                     </div>
                 </header>
 
@@ -40,7 +53,7 @@ export default function HomeScreen() {
                         <DashboardChart />
                     </div>
                     <div className="lg:col-span-1 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-5 shadow-sm h-fit transition-colors duration-300">
-                        <TransactionList transactions={transactions} />
+                        <TransactionList transactions={transactions.slice(0, 5)} />
                     </div>
                 </div>
 

@@ -22,6 +22,19 @@ public class User {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    // Hạn mức chi tiêu bất thường (người dùng tự chỉnh)
+    @Column(name = "threshold_eating")
+    private Double thresholdEating = 500000.0;
+
+    @Column(name = "threshold_shopping")
+    private Double thresholdShopping = 5000000.0;
+
+    @Column(name = "threshold_transport")
+    private Double thresholdTransport = 2000000.0;
+
+    @Column(name = "threshold_others")
+    private Double thresholdOthers = 1000000.0;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 }

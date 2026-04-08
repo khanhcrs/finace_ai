@@ -1,11 +1,12 @@
 package com.finance.tracker.controller;
 
 import com.finance.tracker.model.Transaction;
+import com.finance.tracker.service.NotificationService;
 import com.finance.tracker.service.TransactionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Comparator; 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -17,25 +18,44 @@ public class TransactionController {
     @Autowired
     private TransactionService transactionService;
 
-    // 🔥 SỬA LẠI HÀM NÀY ĐỂ SẮP XẾP
+    @Autowired
+    private NotificationService notificationService;
+
+    // ==========================================
+    // 🌟 GIỮ TÍNH NĂNG: Sắp xếp giao dịch mới nhất lên đầu (Từ Bản 2)
+    // ==========================================
     @GetMapping("/user/{userId}")
     public List<Transaction> getByUser(@PathVariable Long userId) {
         List<Transaction> transactions = transactionService.getTransactionsByUser(userId);
-        
+
         // Dùng Java Stream để sắp xếp danh sách
         // Ưu tiên 1: Sắp xếp theo Ngày giảm dần (Mới nhất lên đầu)
-        // Ưu tiên 2: Nếu cùng 1 ngày, xếp theo ID giảm dần (Cái nào vừa nhập xong lên đầu)
+        // Ưu tiên 2: Nếu cùng 1 ngày, xếp theo ID giảm dần (Cái nào vừa nhập xong lên
+        // đầu)
         if (transactions != null) {
             transactions.sort(Comparator.comparing(Transaction::getTransactionDate).reversed()
-                                        .thenComparing(Transaction::getId).reversed());
+                    .thenComparing(Transaction::getId).reversed());
         }
-        
+
         return transactions;
     }
 
+    // ==========================================
+    // 🌟 GIỮ TÍNH NĂNG: Bắn thông báo khi chi tiêu bất thường (Từ Bản 1)
+    // ==========================================
     @PostMapping
     public Transaction create(@RequestBody Transaction transaction) {
-        return transactionService.saveTransaction(transaction);
+        Transaction saved = transactionService.saveTransaction(transaction);
+
+        // Kiểm tra nếu chi tiêu bất thường thì lưu thông báo vào DB
+        if (Boolean.TRUE.equals(saved.getIsAnomaly()) && saved.getUser() != null) {
+            notificationService.createNotification(
+                    saved.getUser(),
+                    "Cảnh báo chi tiêu!",
+                    "Khoản chi '" + saved.getNote() + "' của bạn có vẻ cao bất thường!");
+        }
+
+        return saved;
     }
 
     @PutMapping("/{id}")
