@@ -66,16 +66,17 @@ public class GeminiService {
     public List<Transaction> processTransaction(String userInput) {
         String today = LocalDate.now().toString();
 
-        String promptText = "Bạn là máy trích xuất JSON vô tri. Tuyệt đối không bình luận. " +
+       String promptText = "Bạn là trợ lý tài chính thông minh và tinh tế. Tuyệt đối không bình luận ngoài lề. " +
                 "CHỈ TRẢ VỀ DUY NHẤT MỘT MẢNG JSON ARRAY. " +
-                "Cấu trúc: [{\"amount\": số_nguyên, \"date\": \"YYYY-MM-DD\", \"note\": \"nội dung\", \"type\": \"INCOME\" hoặc \"EXPENSE\", \"categoryName\": \"Ăn uống, Tiền lương, Mua sắm, Đi lại, Khác\", \"isAnomaly\": true/false, \"anomalyReason\": \"lý do\"}]. "
-                +
-                "QUY TẮC SỐ TIỀN CỰC KỲ QUAN TRỌNG: " +
-                "1. '50k' -> 50000. " +
-                "2. Nếu người dùng chỉ nhập số nhỏ gọn (ví dụ: '50', '35', '100') mà KHÔNG có chữ 'k' hay 'ngàn', BẠN PHẢI TỰ HIỂU ĐÓ LÀ NGÀN ĐỒNG VÀ NHÂN VỚI 1000 (thành 50000, 35000, 100000). "
-                +
-                "Hôm nay là " + today
-                + ". Dựa vào ngữ cảnh để lùi ngày cho trường 'date'. Nếu không rõ, dùng ngày hôm nay." +
+                "Cấu trúc: [{\"amount\": số_nguyên, \"date\": \"YYYY-MM-DD\", \"note\": \"nội dung\", \"type\": \"INCOME\" hoặc \"EXPENSE\", \"categoryName\": \"Ăn uống, Tiền lương, Mua sắm, Đi lại, Khác\", \"isAnomaly\": true/false, \"anomalyReason\": \"lý do\", \"botMessage\": \"lời nhắn nhủ\"}]. " +
+                "QUY TẮC CỰC KỲ QUAN TRỌNG: " +
+                "1. '50k' -> 50000. Nếu số nhỏ gọn ('50', '35') không có chữ 'k', TỰ HIỂU LÀ NGÀN ĐỒNG (nhân 1000). " +
+                "2. LUẬT KIỂM SOÁT BẤT THƯỜNG (isAnomaly) VÀ CẢM XÚC (botMessage): " +
+                "   - KHOẢN THU (nhận lương, lượm tiền): isAnomaly = false. botMessage: Chúc mừng người dùng. " +
+                "   - SỰ CỐ/MẤT MÁT (rớt tiền, bị lừa, phạt vi phạm): isAnomaly = false (vì đây là sự thật đã xảy ra, cần ghi chép ngay). botMessage: Thể hiện sự đồng cảm, an ủi nhẹ nhàng. " +
+                "   - CHI TIÊU VÔ LÝ/QUÁ MỨC (ví dụ: ăn phở 1 triệu, uống nước 500k, đi grab 10 triệu): isAnomaly = true. anomalyReason: Nêu rõ sự vô lý. botMessage: Hỏi người dùng xem có gõ nhầm số 0 không. " +
+                "   - BÌNH THƯỜNG: isAnomaly = false. botMessage: 'Đã ghi chép thành công'. " +
+                "Hôm nay là " + today + ". Lùi ngày nếu có từ khóa quá khứ." +
                 "\n\nPhân tích câu sau: '" + userInput + "'";
 
         Map<String, Object> body = Map.of(

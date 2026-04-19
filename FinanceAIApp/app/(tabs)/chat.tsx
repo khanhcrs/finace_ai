@@ -27,6 +27,9 @@ export default function ChatScreen() {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // NEW: Trạng thái lưu giao dịch đang bị nghi ngờ (bất thường)
+  const [pendingTx, setPendingTx] = useState<any>(null);
 
   const flatListRef = useRef<FlatList>(null);
 
@@ -38,6 +41,7 @@ export default function ChatScreen() {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
+    setPendingTx(null); // Reset pending mỗi lần chat mới
 
     try {
       const savedUserId = await AsyncStorage.getItem('finance_user_id') || '1';
@@ -51,16 +55,28 @@ export default function ChatScreen() {
 
       const { reply, transaction } = response.data;
 
-      const aiMsg: Message = { 
-        id: (Date.now() + 1).toString(), 
-        sender: 'ai', 
-        text: reply || "Đã xử lý xong yêu cầu của bạn!" 
-      };
-      setMessages(prev => [...prev, aiMsg]);
-
       if (transaction) {
-        fetchData();
-        Alert.alert("Thành công", "Đã ghi chép giao dịch!");
+        if (transaction.isAnomaly) {
+          // BƯỚC 1: NẾU BẤT THƯỜNG -> AI CHỈ HỎI LẠI, KHÔNG LƯU NGAY
+          const aiText = transaction.botMessage || transaction.note || "Hệ thống phát hiện khoản chi này có vẻ bất thường. Bạn có chắc chắn muốn lưu không?";
+          const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: aiText };
+          setMessages(prev => [...prev, aiMsg]);
+          
+          // Bật bảng chờ xác nhận
+          setPendingTx(transaction);
+        } else {
+          // BƯỚC 2: NẾU BÌNH THƯỜNG HOẶC RỚT TIỀN -> LƯU LUÔN VÀ BÁO CÁO
+          const aiText = transaction.botMessage || reply || "Đã ghi chép giao dịch thành công!";
+          const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: aiText };
+          setMessages(prev => [...prev, aiMsg]);
+          
+          // Giả định backend đã tự lưu đối với ca bình thường, chỉ cần refresh UI
+          fetchData(); 
+        }
+      } else {
+        // Chat bình thường không có giao dịch
+        const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: reply || "Đã xử lý xong yêu cầu của bạn!" };
+        setMessages(prev => [...prev, aiMsg]);
       }
     } catch (error) {
       console.error(error);
@@ -73,6 +89,32 @@ export default function ChatScreen() {
     } finally {
       setIsTyping(false);
     }
+  };
+
+  // NEW: Hàm xử lý khi bấm nút "Vẫn Lưu"
+  const handleConfirmSave = async () => {
+    if (!pendingTx) return;
+    try {
+      // Gọi API ép buộc lưu vào DB (Cần có API POST /transactions ở Backend)
+      // Nếu Backend của bạn đang tự lưu mọi thứ trong /ai/process thì bỏ qua bước post này.
+      const savedUserId = await AsyncStorage.getItem('finance_user_id') || '1';
+      await axios.post(`${API_BASE_URL}/transactions`, { ...pendingTx, isAnomaly: false, userId: savedUserId });
+      
+      const aiMsg: Message = { id: Date.now().toString(), sender: 'ai', text: "✅ Đã lưu khoản chi đặc biệt này vào sổ!" };
+      setMessages(prev => [...prev, aiMsg]);
+      
+      setPendingTx(null);
+      fetchData();
+    } catch (error) {
+      Alert.alert("Lỗi", "Không thể lưu giao dịch lúc này.");
+    }
+  };
+
+  // NEW: Hàm xử lý khi bấm nút "Hủy"
+  const handleCancelSave = () => {
+    setPendingTx(null);
+    const aiMsg: Message = { id: Date.now().toString(), sender: 'ai', text: "❌ Đã hủy bỏ giao dịch." };
+    setMessages(prev => [...prev, aiMsg]);
   };
 
   const pickImage = async () => {
@@ -185,11 +227,28 @@ export default function ChatScreen() {
           </View>
         )}
 
+        {/* NEW: KHUNG HIỂN THỊ XÁC NHẬN GIAO DỊCH BẤT THƯỜNG */}
+        {pendingTx && (
+          <View style={[styles.confirmBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Text style={[styles.confirmTitle, { color: theme.text }]}>
+              ⚠️ Đang chờ xác nhận khoản chi lớn
+            </Text>
+            <View style={styles.btnRow}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelSave}>
+                <Text style={styles.btnText}>Hủy bỏ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirmSave}>
+                <Text style={styles.btnText}>Vẫn Lưu</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <View style={[styles.inputArea, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
           <TouchableOpacity 
             style={[styles.iconButton, { backgroundColor: theme.card }]} 
             onPress={pickImage}
-            disabled={isTyping || isUploading}
+            disabled={isTyping || isUploading || pendingTx !== null}
           >
             <ImageIcon size={22} color={theme.secondaryText} />
           </TouchableOpacity>
@@ -202,11 +261,12 @@ export default function ChatScreen() {
               value={input}
               onChangeText={setInput}
               multiline
+              editable={pendingTx === null} // Khóa ô nhập khi đang chờ xác nhận
             />
             <TouchableOpacity 
-              style={[styles.sendButton, { backgroundColor: theme.tint === '#000' ? '#000' : '#fff', opacity: !input.trim() ? 0.5 : 1 }]} 
+              style={[styles.sendButton, { backgroundColor: theme.tint === '#000' ? '#000' : '#fff', opacity: (!input.trim() || pendingTx !== null) ? 0.5 : 1 }]} 
               onPress={handleSend}
-              disabled={!input.trim() || isTyping || isUploading}
+              disabled={!input.trim() || isTyping || isUploading || pendingTx !== null}
             >
               <Send size={18} color={theme.tint === '#000' ? '#fff' : '#000'} />
             </TouchableOpacity>
@@ -218,100 +278,65 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  listContent: {
+  container: { flex: 1 },
+  listContent: { padding: 16, paddingBottom: 20 },
+  messageWrapper: { marginBottom: 16, flexDirection: 'row' },
+  userWrapper: { justifyContent: 'flex-end' },
+  aiWrapper: { justifyContent: 'flex-start' },
+  messageBubble: { padding: 12, borderRadius: 20, maxWidth: '85%', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  userBubble: { borderBottomRightRadius: 4 },
+  aiBubble: { borderWidth: 1, borderBottomLeftRadius: 4 },
+  messageText: { fontSize: 15, lineHeight: 20 },
+  messageImage: { width: 200, height: 200, borderRadius: 12, marginBottom: 8 },
+  typingContainer: { paddingHorizontal: 16, marginBottom: 8 },
+  typingBubble: { flexDirection: 'row', alignItems: 'center', padding: 8, paddingHorizontal: 12, borderRadius: 16, alignSelf: 'flex-start' },
+  typingText: { fontSize: 12, marginLeft: 8 },
+  inputArea: { flexDirection: 'row', alignItems: 'center', padding: 12, borderTopWidth: 1 },
+  iconButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  inputContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 22, paddingHorizontal: 4, minHeight: 44 },
+  input: { flex: 1, paddingHorizontal: 12, fontSize: 15, maxHeight: 100 },
+  sendButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', margin: 4 },
+  
+  // STYLE MỚI CHO KHUNG XÁC NHẬN
+  confirmBox: {
     padding: 16,
-    paddingBottom: 20,
-  },
-  messageWrapper: {
-    marginBottom: 16,
-    flexDirection: 'row',
-  },
-  userWrapper: {
-    justifyContent: 'flex-end',
-  },
-  aiWrapper: {
-    justifyContent: 'flex-start',
-  },
-  messageBubble: {
-    padding: 12,
-    borderRadius: 20,
-    maxWidth: '85%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  userBubble: {
-    borderBottomRightRadius: 4,
-  },
-  aiBubble: {
-    borderWidth: 1,
-    borderBottomLeftRadius: 4,
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  messageImage: {
-    width: 200,
-    height: 200,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  typingContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  typingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    paddingHorizontal: 12,
+    marginHorizontal: 16,
+    marginBottom: 12,
     borderRadius: 16,
-    alignSelf: 'flex-start',
+    borderWidth: 1,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  typingText: {
-    fontSize: 12,
-    marginLeft: 8,
+  confirmTitle: {
+    marginBottom: 12,
+    textAlign: 'center',
+    fontWeight: '700',
+    fontSize: 14,
   },
-  inputArea: {
+  btnRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderTopWidth: 1,
+    justifyContent: 'space-between',
   },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  confirmBtn: {
+    backgroundColor: '#10B981', // Màu xanh lục thành công
+    paddingVertical: 10,
+    borderRadius: 8,
+    flex: 0.48,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
   },
-  inputContainer: {
-    flex: 1,
-    flexDirection: 'row',
+  cancelBtn: {
+    backgroundColor: '#EF4444', // Màu đỏ cảnh báo
+    paddingVertical: 10,
+    borderRadius: 8,
+    flex: 0.48,
     alignItems: 'center',
-    borderRadius: 22,
-    paddingHorizontal: 4,
-    minHeight: 44,
   },
-  input: {
-    flex: 1,
-    paddingHorizontal: 12,
+  btnText: {
+    color: '#FFF',
+    fontWeight: 'bold',
     fontSize: 15,
-    maxHeight: 100,
-  },
-  sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: 4,
   }
 });
