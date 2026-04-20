@@ -4,7 +4,8 @@ import axios from 'axios';
 import { 
     ShoppingBag, Coffee, Car, DollarSign, Utensils, 
     Home, Tv, Briefcase, HelpCircle, Zap, Heart, 
-    Bus, Film, BookOpen, GraduationCap 
+    Bus, Film, BookOpen, GraduationCap,
+    Plane, Gift, Stethoscope, PawPrint
 } from 'lucide-react';
 
 const TransactionContext = createContext();
@@ -25,7 +26,11 @@ const ICON_MAP = {
     'Briefcase': Briefcase,
     'BookOpen': BookOpen,
     'GraduationCap': GraduationCap,
-    'HelpCircle': HelpCircle
+    'HelpCircle': HelpCircle,
+    'Plane': Plane,
+    'Gift': Gift,
+    'Stethoscope': Stethoscope,
+    'PawPrint': PawPrint
 };
 
 const API_TX_URL = `http://localhost:8080/api/transactions`;
@@ -42,10 +47,10 @@ export function TransactionProvider({ children }) {
         return savedUserId ? parseInt(savedUserId) : 1;
     };
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (silent = false) => {
         const userId = getUserId();
         try {
-            setIsLoading(true);
+            if (!silent) setIsLoading(true);
             const [catRes, txRes] = await Promise.all([
                 axios.get(`${API_CAT_URL}/user/${userId}`),
                 axios.get(`${API_TX_URL}/user/${userId}`)
@@ -84,7 +89,7 @@ export function TransactionProvider({ children }) {
         } catch (error) {
             console.error("Lỗi khi tải dữ liệu:", error);
         } finally {
-            setIsLoading(false);
+            if (!silent) setIsLoading(false);
         }
     }, []);
 
@@ -95,39 +100,42 @@ export function TransactionProvider({ children }) {
     const addTransaction = async (newTx) => {
         const userId = getUserId();
         try {
-            let categoryId = null;
+            let categoryId = newTx.categoryId;
 
-            if (newTx.icon && typeof newTx.icon !== 'string') {
-                const iconName = newTx.icon.displayName || newTx.icon.name;
-                if (iconName) {
-                    const matched = categories.find(c => c.icon === iconName);
+            // Nếu KHÔNG có categoryId truyền vào, mới thử logic đoán category
+            if (!categoryId) {
+                if (newTx.icon && typeof newTx.icon !== 'string') {
+                    const iconName = newTx.icon.displayName || newTx.icon.name;
+                    if (iconName) {
+                        const matched = categories.find(c => c.icon === iconName);
+                        if (matched) categoryId = matched.id;
+                    }
+                }
+
+                if (!categoryId && newTx.category) {
+                    const matched = categories.find(c => c.name.toLowerCase().includes(newTx.category.toLowerCase()));
                     if (matched) categoryId = matched.id;
                 }
-            }
 
-            if (!categoryId && newTx.category) {
-                const matched = categories.find(c => c.name.toLowerCase().includes(newTx.category.toLowerCase()));
-                if (matched) categoryId = matched.id;
-            }
+                if (!categoryId && newTx.title) {
+                    const titleLower = newTx.title.toLowerCase();
+                    const isFood = ['ăn sáng', 'ăn trưa', 'ăn tối', 'ăn phở', 'ăn uống', 'cà phê', 'cafe', 'trà sữa'].some(k => titleLower.includes(k));
+                    const isTransport = ['xăng', 'xe ôm', 'grab', 'di chuyển', 'taxi'].some(k => titleLower.includes(k));
+                    const isShopping = ['mua', 'vé số', 'quần áo', 'siêu thị'].some(k => titleLower.includes(k));
 
-            if (!categoryId && newTx.title) {
-                const titleLower = newTx.title.toLowerCase();
-                const isFood = ['ăn sáng', 'ăn trưa', 'ăn tối', 'ăn phở', 'ăn uống', 'cà phê', 'cafe', 'trà sữa'].some(k => titleLower.includes(k));
-                const isTransport = ['xăng', 'xe ôm', 'grab', 'di chuyển', 'taxi'].some(k => titleLower.includes(k));
-                const isShopping = ['mua', 'vé số', 'quần áo', 'siêu thị'].some(k => titleLower.includes(k));
-
-                if (isFood) {
-                    categoryId = categories.find(c => c.name === 'Ăn uống')?.id;
-                } else if (isTransport) {
-                    categoryId = categories.find(c => c.name === 'Di chuyển')?.id;
-                } else if (isShopping) {
-                    categoryId = categories.find(c => c.name === 'Mua sắm')?.id;
+                    if (isFood) {
+                        categoryId = categories.find(c => c.name === 'Ăn uống')?.id;
+                    } else if (isTransport) {
+                        categoryId = categories.find(c => c.name === 'Di chuyển')?.id;
+                    } else if (isShopping) {
+                        categoryId = categories.find(c => c.name === 'Mua sắm')?.id;
+                    }
                 }
-            }
 
-            if (!categoryId && categories.length > 0) {
-                const fallbackList = categories.filter(c => c.type === (newTx.isIncome ? 'INCOME' : 'EXPENSE'));
-                categoryId = fallbackList.length > 0 ? fallbackList[0].id : categories[0].id;
+                if (!categoryId && categories.length > 0) {
+                    const fallbackList = categories.filter(c => c.type === (newTx.isIncome ? 'INCOME' : 'EXPENSE'));
+                    categoryId = fallbackList.length > 0 ? fallbackList[0].id : categories[0].id;
+                }
             }
 
             if (!categoryId) return false;
@@ -143,7 +151,7 @@ export function TransactionProvider({ children }) {
             };
 
             await axios.post(API_TX_URL, dataToSend);
-            await fetchData();
+            await fetchData(true);
             return true;
         } catch (error) {
             console.error("Lỗi khi lưu vào DB:", error);
@@ -164,7 +172,7 @@ export function TransactionProvider({ children }) {
             };
 
             await axios.put(`${API_TX_URL}/${id}`, dataToSend);
-            await fetchData();
+            await fetchData(true);
             return true;
         } catch (error) {
             console.error("Lỗi khi cập nhật giao dịch:", error);
@@ -175,7 +183,7 @@ export function TransactionProvider({ children }) {
     const deleteTransaction = async (id) => {
         try {
             await axios.delete(`${API_TX_URL}/${id}`);
-            await fetchData();
+            await fetchData(true);
             return true;
         } catch (error) {
             console.error("Lỗi khi xóa giao dịch:", error);

@@ -23,4 +23,6 @@ public class Category {
     private String type;
 
     private String icon;
+
+    private Double limitAmount;
 }

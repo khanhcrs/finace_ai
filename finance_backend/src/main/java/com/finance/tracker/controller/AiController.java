@@ -144,6 +144,7 @@ public class AiController {
 
                 return ResponseEntity.ok(Map.of(
                         "mustConfirm", false,
+                        "saved", true,
                         "reply", replyMsg.toString()));
             }
             return ResponseEntity.badRequest()

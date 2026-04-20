@@ -61,19 +61,26 @@ public class GeminiService {
     }
 
     // ==========================================
-    // 1. XỬ LÝ TEXT CHAT ĐA GIAO DỊCH (Bản 2)
+    // 1. XỬ LÝ TEXT CHAT ĐA GIAO DỊCH (Bản Gộp Hoàn Hảo)
     // ==========================================
     public List<Transaction> processTransaction(String userInput) {
         String today = LocalDate.now().toString();
 
-        String promptText = "Bạn là máy trích xuất JSON vô tri. Tuyệt đối không bình luận. " +
+        // GỘP PROMPT: Giữ sự thông minh của bản 1 + Quy tắc dịch số tiền của bản 2
+        String promptText = "Bạn là trợ lý tài chính thông minh và tinh tế. Tuyệt đối không bình luận ngoài lề. " +
                 "CHỈ TRẢ VỀ DUY NHẤT MỘT MẢNG JSON ARRAY. " +
-                "Cấu trúc: [{\"amount\": số_nguyên, \"date\": \"YYYY-MM-DD\", \"note\": \"nội dung\", \"type\": \"INCOME\" hoặc \"EXPENSE\", \"categoryName\": \"Ăn uống, Tiền lương, Mua sắm, Đi lại, Khác\", \"isAnomaly\": true/false, \"anomalyReason\": \"lý do\"}]. "
+                "Cấu trúc: [{\"amount\": số_nguyên, \"date\": \"YYYY-MM-DD\", \"note\": \"nội dung\", \"type\": \"INCOME\" hoặc \"EXPENSE\", \"categoryName\": \"Ăn uống, Tiền lương, Mua sắm, Di chuyển, Khác\", \"isAnomaly\": true/false, \"anomalyReason\": \"lý do\", \"botMessage\": \"lời nhắn nhủ\"}]. "
                 +
-                "QUY TẮC SỐ TIỀN CỰC KỲ QUAN TRỌNG: " +
-                "1. '50k' -> 50000. " +
-                "2. Nếu người dùng chỉ nhập số nhỏ gọn (ví dụ: '50', '35', '100') mà KHÔNG có chữ 'k' hay 'ngàn', BẠN PHẢI TỰ HIỂU ĐÓ LÀ NGÀN ĐỒNG VÀ NHÂN VỚI 1000 (thành 50000, 35000, 100000). "
+                "QUY TẮC CỰC KỲ QUAN TRỌNG: " +
+                "1. XỬ LÝ SỐ TIỀN: '50k' -> 50000. Nếu người dùng chỉ nhập số nhỏ gọn (ví dụ: '50', '35', '100') mà KHÔNG có chữ 'k' hay 'ngàn', BẠN PHẢI TỰ HIỂU ĐÓ LÀ NGÀN ĐỒNG VÀ NHÂN VỚI 1000 (thành 50000, 35000, 100000). "
                 +
+                "2. LUẬT KIỂM SOÁT BẤT THƯỜNG (isAnomaly) VÀ CẢM XÚC (botMessage): " +
+                "   - KHOẢN THU (nhận lương, lượm tiền): isAnomaly = false. botMessage: Chúc mừng người dùng. " +
+                "   - SỰ CỐ/MẤT MÁT (rớt tiền, bị lừa, phạt vi phạm): isAnomaly = false (vì đây là sự thật đã xảy ra, cần ghi chép ngay). botMessage: Thể hiện sự đồng cảm, an ủi nhẹ nhàng. "
+                +
+                "   - CHI TIÊU VÔ LÝ/QUÁ MỨC (ví dụ: ăn phở 1 triệu, uống nước 500k, đi grab 10 triệu): isAnomaly = true. anomalyReason: Nêu rõ sự vô lý. botMessage: Hỏi người dùng xem có gõ nhầm số 0 không. "
+                +
+                "   - BÌNH THƯỜNG: isAnomaly = false. botMessage: 'Đã ghi chép thành công'. " +
                 "Hôm nay là " + today
                 + ". Dựa vào ngữ cảnh để lùi ngày cho trường 'date'. Nếu không rõ, dùng ngày hôm nay." +
                 "\n\nPhân tích câu sau: '" + userInput + "'";
@@ -135,6 +142,12 @@ public class GeminiService {
                         reason = " [" + reasonStr + "]";
                     }
                 }
+
+                // Lưu ý: Nếu entity Transaction của bạn CÓ hỗ trợ setBotMessage() thì bạn thêm
+                // dòng dưới vào.
+                // Nếu chưa có, AI vẫn sẽ đẩy botMessage qua controller để Frontend đọc.
+                // transaction.setBotMessage(data.path("botMessage").asText(""));
+
                 transaction.setNote(
                         data.path("categoryName").asText("Khác") + "|" + data.path("note").asText("") + reason);
                 transactions.add(transaction);
@@ -161,7 +174,7 @@ public class GeminiService {
     }
 
     // ==========================================
-    // 2. PHÂN TÍCH TÀI CHÍNH (Bản 2)
+    // 2. PHÂN TÍCH TÀI CHÍNH
     // ==========================================
     public String analyzeSpending(List<Transaction> transactions) {
         if (transactions == null || transactions.isEmpty())
@@ -198,7 +211,7 @@ public class GeminiService {
     }
 
     // ==========================================
-    // 3. ĐỌC HÓA ĐƠN HÌNH ẢNH (Phục hồi từ Bản 1)
+    // 3. ĐỌC HÓA ĐƠN HÌNH ẢNH
     // ==========================================
     public Transaction processReceiptImage(MultipartFile file) {
         try {
@@ -218,8 +231,7 @@ public class GeminiService {
             Map<String, Object> imagePart = Map.of("inline_data", inlineData);
             Map<String, Object> textPart = Map.of("text", promptText);
 
-            Map<String, Object> body = Map.of(
-                    "contents", List.of(Map.of("parts", List.of(textPart, imagePart))));
+            Map<String, Object> body = Map.of("contents", List.of(Map.of("parts", List.of(textPart, imagePart))));
 
             String response = webClient.post()
                     .uri(uriBuilder -> uriBuilder.path("/v1beta/models/gemini-2.5-flash:generateContent")
@@ -233,13 +245,11 @@ public class GeminiService {
             JsonNode root = objectMapper.readTree(response);
             String rawText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
 
-            // Dùng hàm extractJson an toàn
             String cleanJson = extractJson(rawText);
             JsonNode data = objectMapper.readTree(cleanJson);
 
             Transaction transaction = new Transaction();
 
-            // Ép kiểu an toàn (lọc bỏ chữ nếu có)
             String amtStr = data.path("amount").asText("0").replaceAll("[^0-9]", "");
             if (amtStr.isEmpty())
                 amtStr = "0";
@@ -261,7 +271,7 @@ public class GeminiService {
     }
 
     // ==========================================
-    // 4. HỎI ĐÁP THEO LỊCH SỬ (Bản 2)
+    // 4. HỎI ĐÁP THEO LỊCH SỬ
     // ==========================================
     public String answerQuestion(String question, String transactionHistory) {
         String promptText = "Dữ liệu:\n" + transactionHistory + "\nCâu hỏi: " + question

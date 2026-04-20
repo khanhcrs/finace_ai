@@ -46,7 +46,7 @@ export default function ChatbotPanel() {
                 const confirmRes = await axios.post(`http://localhost:8080/api/ai/save-confirmed?userId=${savedUserId}`, pendingTransaction);
                 setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'ai', text: confirmRes.data.reply }]);
                 setPendingTransaction(null);
-                if (fetchData) fetchData();
+                if (fetchData) fetchData(true);
                 toast.success("Đã lưu giao dịch!");
                 return;
             }
@@ -57,7 +57,11 @@ export default function ChatbotPanel() {
                     params: { text: textToProcess, userId: savedUserId }
                 });
 
-                const { reply, transaction, mustConfirm } = response.data;
+                const { reply, transaction, mustConfirm, saved } = response.data;
+
+                if (saved) {
+                    if (fetchData) fetchData(true);
+                }
 
                 if (mustConfirm) {
                     setPendingTransaction(transaction);
@@ -68,7 +72,9 @@ export default function ChatbotPanel() {
                 setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'ai', text: reply }]);
                 
                 if (transaction && !mustConfirm && fetchData) {
-                    fetchData();
+                    fetchData(true);
+                    toast.success("Đã ghi chép!");
+                } else if (saved) {
                     toast.success("Đã ghi chép!");
                 }
             } catch (err) {
@@ -127,7 +133,7 @@ export default function ChatbotPanel() {
                     text: `✅ Mình đã đọc xong hóa đơn!\n\n**Nội dung:** ${transaction.note}\n**Số tiền:** ${amountFormatted}\n**Danh mục:** ${transaction.category?.name || 'Khác'}\n\nĐã lưu vào lịch sử giao dịch của bạn.` 
                 }]);
                 
-                if (fetchData) fetchData();
+                if (fetchData) fetchData(true);
                 toast.success("Phân tích hóa đơn thành công!");
             }
         } catch (error) {
