@@ -27,6 +27,9 @@ export default function ChatScreen() {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // NEW: Trạng thái lưu giao dịch đang bị nghi ngờ (bất thường)
+  const [pendingTx, setPendingTx] = useState<any>(null);
 
   // Trạng thái giữ giao dịch đang bị nghi ngờ (bất thường)
   const [pendingTx, setPendingTx] = useState<any>(null);

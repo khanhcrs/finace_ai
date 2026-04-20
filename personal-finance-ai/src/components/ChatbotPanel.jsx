@@ -7,9 +7,10 @@ import { toast } from 'react-hot-toast';
 export default function ChatbotPanel() {
     const { fetchData } = useTransaction();
     const userName = localStorage.getItem('finance_user_name') || 'bạn';
+    const savedUserId = localStorage.getItem('finance_user_id') || 1;
 
     const [messages, setMessages] = useState([
-        { id: 1, sender: 'ai', text: `Chào ${userName}! Mình là Trợ lý AI. Bạn muốn ghi chép hay tâm sự gì với mình hôm nay?` }
+        { id: 1, sender: 'ai', text: `Chào ${userName}! Mình là Trợ lý AI (Gemini 2.5). Bạn ghi chép hoặc hỏi mình nhé!` }
     ]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -24,7 +25,7 @@ export default function ChatbotPanel() {
     }, [messages, isTyping, isUploading]);
 
     const handleSend = async () => {
-        if (!input.trim()) return;
+        if (!input.trim() || pendingTx) return;
 
         const textToProcess = input.trim();
         const lowerInput = textToProcess.toLowerCase();
@@ -89,11 +90,10 @@ export default function ChatbotPanel() {
                     throw err;
                 }
             }
-
         } catch (error) {
-            console.error(error);
-            const errorMsg = error.response?.data?.reply || "❌ Máy chủ AI đang bận hoặc có lỗi kết nối.";
-            setMessages((prev) => [...prev, { id: Date.now() + Math.random(), sender: 'ai', text: errorMsg }]);
+            // 🔥 FIX: Thay vì báo máy chủ bận chung chung, lấy luôn câu chửi của Backend lên (nếu có)
+            const errorMsg = error.response?.data?.reply || "❌ Máy chủ đang bận hoặc hết hạn mức API, vui lòng thử lại sau!";
+            setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: errorMsg }]);
         } finally {
             setIsTyping(false);
         }
@@ -147,30 +147,35 @@ export default function ChatbotPanel() {
     };
 
     return (
-        <aside className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col hidden lg:flex shadow-[-4px_0_24px_rgba(0,0,0,0.02)] z-10 transition-colors duration-300">
-            {/* Header */}
-            <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center space-x-3 bg-gray-50/50 dark:bg-gray-800/50 transition-colors">
-                <div className="bg-black dark:bg-white p-2 rounded-lg text-white dark:text-black transition-colors">
+        <aside className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 flex flex-col hidden lg:flex shadow-sm">
+            <div className="p-4 border-b border-gray-100 flex items-center space-x-3">
+                <div className="bg-black p-2 rounded-lg text-white">
                     <MessageSquare size={18} />
                 </div>
-                <div>
-                    <h3 className="font-bold text-sm text-gray-900 dark:text-white">Trợ lý Tài chính AI</h3>
-                    <p className="text-xs text-green-600 dark:text-green-400 font-medium flex items-center">
-                        <span className="w-2 h-2 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>
-                        Đang hoạt động
-                    </p>
-                </div>
+                <h3 className="font-bold text-sm">Trợ lý AI</h3>
             </div>
 
-            {/* Vùng Chat */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50/30 dark:bg-gray-900/50 transition-colors">
+            <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50/50">
                 {messages.map((msg) => (
                     <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] p-3 text-sm leading-relaxed transition-colors whitespace-pre-wrap ${msg.sender === 'user'
-                            ? 'bg-black dark:bg-white text-white dark:text-black rounded-2xl rounded-tr-sm'
-                            : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-2xl rounded-tl-sm shadow-sm'
-                            }`}>
-                            <span dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}></span>
+                        <div className={`max-w-[90%] p-3 text-sm rounded-2xl shadow-sm ${
+                            msg.sender === 'user' ? 'bg-black text-white rounded-tr-sm' : 
+                            msg.isConfirmMsg ? 'bg-amber-50 border border-amber-200 text-amber-900 rounded-tl-sm' :
+                            'bg-white text-gray-800 rounded-tl-sm'
+                        }`}>
+                            {/* 🔥 SỬA LỖI ĐỎ REPLACE TẠI ĐÂY (ÉP KIỂU STRING) */}
+                            <span dangerouslySetInnerHTML={{ __html: String(msg.text || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}></span>
+                            
+                            {msg.isConfirmMsg && pendingTx && (
+                                <div className="mt-4 flex gap-2 border-t border-amber-200 pt-3">
+                                    <button onClick={() => confirmAction('yes')} className="flex-1 bg-amber-600 text-white py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-amber-700">
+                                        <Check size={14} /> Xác nhận
+                                    </button>
+                                    <button onClick={() => confirmAction('no')} className="flex-1 bg-white text-amber-700 border border-amber-300 py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-amber-50">
+                                        <X size={14} /> Hủy bỏ
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}

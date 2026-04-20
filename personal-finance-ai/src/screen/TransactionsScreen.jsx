@@ -1,6 +1,7 @@
 // File: src/screens/TransactionsScreen/TransactionsScreen.jsx
-import { useState } from 'react'; // 1. Import thêm useState
-import { Search, Filter, Edit2, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+// 1. ĐÃ THÊM DOLLAR SIGN VÀO ĐÂY ĐỂ LÀM ICON THẾ THÂN
+import { Search, Filter, Edit2, Trash2, DollarSign } from 'lucide-react';
 import { useTransaction } from '../contexts/TransactionContext';
 import { formatCurrency } from '../utils/format';
 import { toast } from 'react-hot-toast';
@@ -87,7 +88,9 @@ export default function TransactionsScreen() {
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                             {filteredTransactions.map((tx) => {
-                                const Icon = tx.icon;
+                                // 2. BỌC THÉP TẠI ĐÂY: Nếu tx.icon bị rỗng, lập tức lấy DollarSign đắp vào!
+                                const Icon = tx.icon || DollarSign;
+                                
                                 return (
                                     <tr key={tx.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors group">
                                         <td className="px-6 py-4">
