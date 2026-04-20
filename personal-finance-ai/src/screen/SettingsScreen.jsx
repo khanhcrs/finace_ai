@@ -1,60 +1,74 @@
 import { useState, useEffect } from 'react';
-import { User, Palette, PieChart, Wallet, Save, Loader2 } from 'lucide-react';
+import { User, Palette, PieChart, Wallet, Save, Loader2, Plus, Edit2, Check, X, Trash2 } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
+import { useTransaction } from '../contexts/TransactionContext';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 
 export default function SettingsScreen() {
     const { darkMode, setDarkMode, chartType, setChartType, reportRange, setReportRange } = useSettings();
+    const { categories, fetchData } = useTransaction();
     
-    const [thresholds, setThresholds] = useState({
-        thresholdEating: '500000',
-        thresholdShopping: '5000000',
-        thresholdTransport: '2000000',
-        thresholdOthers: '1000000'
-    });
     const [isLoading, setIsLoading] = useState(false);
-    const [isSaving, setIsSubmitting] = useState(false);
+
+    // Category states
+    const [isAddingCategory, setIsAddingCategory] = useState(false);
+    const [newCategory, setNewCategory] = useState({ name: '', type: 'EXPENSE', icon: 'HelpCircle', limitAmount: '' });
+    const [editingCategoryId, setEditingCategoryId] = useState(null);
+    const [editCategoryData, setEditCategoryData] = useState({ name: '', limitAmount: '', icon: '' });
+
+    const AVAILABLE_ICONS = [
+        'Coffee', 'Utensils', 'Car', 'Bus', 'ShoppingBag', 'DollarSign', 
+        'Home', 'Tv', 'Film', 'Zap', 'Heart', 'Briefcase', 'BookOpen', 
+        'GraduationCap', 'HelpCircle', 'Plane', 'Gift', 'Stethoscope', 'PawPrint'
+    ];
 
     const userId = localStorage.getItem('finance_user_id') || 1;
 
-    useEffect(() => {
-        fetchThresholds();
-    }, [userId]);
-
-    const fetchThresholds = async () => {
+    const handleAddCategory = async () => {
+        if (!newCategory.name.trim()) {
+            toast.error("Vui lòng nhập tên danh mục");
+            return;
+        }
         try {
-            setIsLoading(true);
-            const res = await axios.get(`http://localhost:8080/api/users/${userId}`);
-            const userData = res.data;
-            setThresholds({
-                thresholdEating: userData.thresholdEating?.toString() || '500000',
-                thresholdShopping: userData.thresholdShopping?.toString() || '5000000',
-                thresholdTransport: userData.thresholdTransport?.toString() || '2000000',
-                thresholdOthers: userData.thresholdOthers?.toString() || '1000000',
+            await axios.post(`http://localhost:8080/api/categories`, {
+                ...newCategory,
+                limitAmount: newCategory.limitAmount ? parseFloat(newCategory.limitAmount) : null,
+                user: { id: userId }
             });
+            toast.success("Đã thêm danh mục mới!");
+            setIsAddingCategory(false);
+            setNewCategory({ name: '', type: 'EXPENSE', icon: 'HelpCircle', limitAmount: '' });
+            fetchData(); // Refresh categories from context
         } catch (e) {
-            console.error("Lỗi khi tải hạn mức:", e);
-        } finally {
-            setIsLoading(false);
+            toast.error("Lỗi khi thêm danh mục");
         }
     };
 
-    const handleSaveThresholds = async () => {
+    const handleUpdateCategory = async (cat) => {
         try {
-            setIsSubmitting(true);
-            await axios.put(`http://localhost:8080/api/users/${userId}/thresholds`, {
-                thresholdEating: parseFloat(thresholds.thresholdEating),
-                thresholdShopping: parseFloat(thresholds.thresholdShopping),
-                thresholdTransport: parseFloat(thresholds.thresholdTransport),
-                thresholdOthers: parseFloat(thresholds.thresholdOthers)
+            await axios.post(`http://localhost:8080/api/categories`, {
+                ...cat,
+                name: editCategoryData.name,
+                icon: editCategoryData.icon,
+                limitAmount: editCategoryData.limitAmount ? parseFloat(editCategoryData.limitAmount) : null,
+                user: { id: userId }
             });
-            toast.success("Đã cập nhật hạn mức chi tiêu!");
+            toast.success("Đã cập nhật danh mục!");
+            setEditingCategoryId(null);
+            fetchData();
         } catch (e) {
-            toast.error("Không thể lưu cài đặt.");
-        } finally {
-            setIsSubmitting(false);
+            toast.error("Lỗi khi cập nhật danh mục");
         }
+    };
+
+    const startEditing = (cat) => {
+        setEditingCategoryId(cat.id);
+        setEditCategoryData({ 
+            name: cat.name, 
+            limitAmount: cat.limitAmount?.toString() || '',
+            icon: cat.icon || 'HelpCircle'
+        });
     };
 
     return (
@@ -89,71 +103,154 @@ export default function SettingsScreen() {
                     </div>
                 </div>
 
-                {/* 2. CÀI ĐẶT HẠN MỨC CHI TIÊU (MỚI) */}
+                {/* 2. QUẢN LÝ DANH MỤC & HẠN MỨC (NEW) */}
                 <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 shadow-sm transition-colors duration-300">
-                    <div className="flex items-center space-x-3 mb-6">
-                        <Wallet className="text-gray-400 dark:text-gray-500" size={24} />
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Hạn mức Chi tiêu Bất thường (VNĐ)</h3>
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center space-x-3">
+                            <Wallet className="text-gray-400 dark:text-gray-500" size={24} />
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Quản lý Danh mục & Hạn mức</h3>
+                        </div>
+                        <button 
+                            onClick={() => setIsAddingCategory(!isAddingCategory)}
+                            className="flex items-center space-x-1 text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                            {isAddingCategory ? <X size={16} /> : <Plus size={16} />}
+                            <span>{isAddingCategory ? 'Hủy' : 'Thêm mới'}</span>
+                        </button>
                     </div>
 
-                    {isLoading ? (
-                        <div className="flex justify-center py-8">
-                            <Loader2 className="animate-spin text-gray-400" size={32} />
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-4">
+                    {isAddingCategory && (
+                        <div className="mb-8 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Ăn uống</label>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Tên danh mục</label>
                                     <input 
-                                        type="number" 
-                                        value={thresholds.thresholdEating}
-                                        onChange={(e) => setThresholds({...thresholds, thresholdEating: e.target.value})}
-                                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white rounded-xl py-2.5 px-4 text-sm font-bold focus:border-black dark:focus:border-white outline-none transition-all" 
+                                        type="text" 
+                                        placeholder="Ví dụ: Du lịch"
+                                        value={newCategory.name}
+                                        onChange={(e) => setNewCategory({...newCategory, name: e.target.value})}
+                                        className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white rounded-lg py-2 px-3 text-sm"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Mua sắm</label>
-                                    <input 
-                                        type="number" 
-                                        value={thresholds.thresholdShopping}
-                                        onChange={(e) => setThresholds({...thresholds, thresholdShopping: e.target.value})}
-                                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white rounded-xl py-2.5 px-4 text-sm font-bold focus:border-black dark:focus:border-white outline-none transition-all" 
-                                    />
-                                </div>
-                            </div>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Di chuyển</label>
-                                    <input 
-                                        type="number" 
-                                        value={thresholds.thresholdTransport}
-                                        onChange={(e) => setThresholds({...thresholds, thresholdTransport: e.target.value})}
-                                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white rounded-xl py-2.5 px-4 text-sm font-bold focus:border-black dark:focus:border-white outline-none transition-all" 
-                                    />
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Loại</label>
+                                    <select 
+                                        value={newCategory.type}
+                                        onChange={(e) => setNewCategory({...newCategory, type: e.target.value})}
+                                        className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white rounded-lg py-2 px-3 text-sm"
+                                    >
+                                        <option value="EXPENSE">Chi tiêu</option>
+                                        <option value="INCOME">Thu nhập</option>
+                                    </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Danh mục khác</label>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Biểu tượng</label>
+                                    <select 
+                                        value={newCategory.icon}
+                                        onChange={(e) => setNewCategory({...newCategory, icon: e.target.value})}
+                                        className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white rounded-lg py-2 px-3 text-sm"
+                                    >
+                                        {AVAILABLE_ICONS.map(icon => (
+                                            <option key={icon} value={icon}>{icon}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Hạn mức (VNĐ)</label>
                                     <input 
                                         type="number" 
-                                        value={thresholds.thresholdOthers}
-                                        onChange={(e) => setThresholds({...thresholds, thresholdOthers: e.target.value})}
-                                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white rounded-xl py-2.5 px-4 text-sm font-bold focus:border-black dark:focus:border-white outline-none transition-all" 
+                                        placeholder="Không giới hạn"
+                                        value={newCategory.limitAmount}
+                                        onChange={(e) => setNewCategory({...newCategory, limitAmount: e.target.value})}
+                                        className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white rounded-lg py-2 px-3 text-sm"
                                     />
                                 </div>
-                            </div>
-                            <div className="md:col-span-2 pt-2">
-                                <button
-                                    onClick={handleSaveThresholds}
-                                    disabled={isSaving}
-                                    className="w-full md:w-auto flex items-center justify-center space-x-2 bg-black dark:bg-white text-white dark:text-black px-8 py-3 rounded-xl font-bold hover:opacity-80 active:scale-95 transition-all disabled:opacity-50"
-                                >
-                                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                                    <span>Lưu cài đặt hạn mức</span>
-                                </button>
+                                <div className="md:col-span-2 lg:col-span-4 flex justify-end">
+                                    <button 
+                                        onClick={handleAddCategory}
+                                        className="bg-black dark:bg-white text-white dark:text-black px-4 py-2 rounded-lg text-sm font-bold flex items-center space-x-2"
+                                    >
+                                        <Check size={16} />
+                                        <span>Lưu danh mục</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="border-b border-gray-100 dark:border-gray-800">
+                                    <th className="pb-3 text-xs font-bold text-gray-400 uppercase">Danh mục</th>
+                                    <th className="pb-3 text-xs font-bold text-gray-400 uppercase">Loại</th>
+                                    <th className="pb-3 text-xs font-bold text-gray-400 uppercase text-right">Hạn mức hàng tháng</th>
+                                    <th className="pb-3 text-xs font-bold text-gray-400 uppercase text-right">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                                {categories.map((cat) => (
+                                    <tr key={cat.id} className="group transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
+                                        <td className="py-4 font-medium text-gray-900 dark:text-gray-100">
+                                            {editingCategoryId === cat.id ? (
+                                                <div className="space-y-2">
+                                                    <input 
+                                                        type="text" 
+                                                        value={editCategoryData.name}
+                                                        onChange={(e) => setEditCategoryData({...editCategoryData, name: e.target.value})}
+                                                        className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-sm w-32 block"
+                                                    />
+                                                    <select 
+                                                        value={editCategoryData.icon}
+                                                        onChange={(e) => setEditCategoryData({...editCategoryData, icon: e.target.value})}
+                                                        className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-sm w-32 block"
+                                                    >
+                                                        {AVAILABLE_ICONS.map(icon => (
+                                                            <option key={icon} value={icon}>{icon}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center space-x-2">
+                                                    <span className="text-gray-400 text-xs w-20 truncate">[{cat.icon}]</span>
+                                                    <span>{cat.name}</span>
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="py-4">
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cat.type === 'INCOME' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                                                {cat.type === 'INCOME' ? 'THU NHẬP' : 'CHI TIÊU'}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 text-right font-bold text-gray-700 dark:text-gray-300">
+                                            {editingCategoryId === cat.id ? (
+                                                <input 
+                                                    type="number" 
+                                                    value={editCategoryData.limitAmount}
+                                                    onChange={(e) => setEditCategoryData({...editCategoryData, limitAmount: e.target.value})}
+                                                    className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-sm w-32 text-right"
+                                                />
+                                            ) : (
+                                                cat.limitAmount ? Number(cat.limitAmount).toLocaleString() + ' đ' : '∞'
+                                            )}
+                                        </td>
+                                        <td className="py-4 text-right">
+                                            {editingCategoryId === cat.id ? (
+                                                <div className="flex items-center justify-end space-x-2">
+                                                    <button onClick={() => handleUpdateCategory(cat)} className="text-green-600 p-1 hover:bg-green-50 rounded"><Check size={18} /></button>
+                                                    <button onClick={() => setEditingCategoryId(null)} className="text-gray-400 p-1 hover:bg-gray-50 rounded"><X size={18} /></button>
+                                                </div>
+                                            ) : (
+                                                <button onClick={() => startEditing(cat)} className="text-gray-400 hover:text-black dark:hover:text-white transition-colors">
+                                                    <Edit2 size={16} />
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 {/* 3. TUỲ CHỈNH GIAO DIỆN */}

@@ -1,47 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, ShoppingBag, Coffee, Car, DollarSign } from 'lucide-react';
 import { useTransaction } from '../contexts/TransactionContext';
 import { toast } from 'react-hot-toast';
 
 export default function AddTransactionModal({ isOpen, onClose }) {
-    const { addTransaction } = useTransaction();
+    const { addTransaction, categories } = useTransaction();
 
     // State lưu trữ dữ liệu người dùng nhập
     const [type, setType] = useState('expense'); // 'expense' hoặc 'income'
     const [amount, setAmount] = useState('');
     const [title, setTitle] = useState('');
-    const [category, setCategory] = useState('Coffee'); // Mặc định chọn icon Coffee
+    const [categoryId, setCategoryId] = useState(''); 
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Danh sách Category để render ra UI cho người dùng chọn
-    const CATEGORIES = [
-        { id: 'Coffee', name: 'Ăn uống', icon: Coffee, type: 'expense' },
-        { id: 'Car', name: 'Di chuyển', icon: Car, type: 'expense' },
-        { id: 'ShoppingBag', name: 'Mua sắm', icon: ShoppingBag, type: 'expense' },
-        { id: 'DollarSign', name: 'Lương', icon: DollarSign, type: 'income' },
-    ];
-
     // Lọc category theo loại (Thu/Chi) đang chọn
-    const filteredCategories = CATEGORIES.filter(c => c.type === type);
+    const filteredCategories = categories.filter(c => c.type === (type === 'expense' ? 'EXPENSE' : 'INCOME'));
+
+    // Cập nhật category mặc định khi type hoặc danh sách categories thay đổi
+    useEffect(() => {
+        if (filteredCategories.length > 0) {
+            setCategoryId(filteredCategories[0].id);
+        }
+    }, [type, categories]);
 
     // Xử lý khi bấm nút "Lưu giao dịch"
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!amount || !title || isSubmitting) return;
+        if (!amount || !title || isSubmitting || !categoryId) return;
 
         setIsSubmitting(true);
         const loadingToast = toast.loading('Đang lưu giao dịch...');
 
         try {
-            // Tìm icon component tương ứng với category người dùng chọn
-            const selectedCat = CATEGORIES.find(c => c.id === category);
-
             // Tạo object giao dịch mới để gửi xuống Context
             const newTx = {
                 title: title,
                 amount: parseInt(amount.replace(/\D/g, '')), // Ép kiểu số nguyên
                 isIncome: type === 'income',
-                icon: selectedCat ? selectedCat.icon : ShoppingBag
+                categoryId: parseInt(categoryId)
             };
 
             // Gọi hàm addTransaction từ Context
@@ -100,7 +96,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                         <button
                             type="button"
                             disabled={isSubmitting}
-                            onClick={() => { setType('expense'); setCategory('Coffee'); }} // Chuyển tab thì reset category
+                            onClick={() => { setType('expense'); }} 
                             className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${type === 'expense' ? 'bg-white dark:bg-gray-700 text-expense shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
                         >
                             Khoản chi
@@ -108,7 +104,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                         <button
                             type="button"
                             disabled={isSubmitting}
-                            onClick={() => { setType('income'); setCategory('DollarSign'); }}
+                            onClick={() => { setType('income'); }}
                             className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${type === 'income' ? 'bg-white dark:bg-gray-700 text-income shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
                         >
                             Khoản thu
@@ -149,9 +145,9 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                         <div>
                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Danh mục</label>
                             <select
-                                value={category}
+                                value={categoryId}
                                 disabled={isSubmitting}
-                                onChange={(e) => setCategory(e.target.value)}
+                                onChange={(e) => setCategoryId(e.target.value)}
                                 className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl py-3 px-4 text-sm font-medium text-gray-900 dark:text-white focus:border-black dark:focus:border-white outline-none transition-all appearance-none cursor-pointer disabled:opacity-50"
                             >
                                 {filteredCategories.map(c => (

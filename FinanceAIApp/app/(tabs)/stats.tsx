@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
 import { useTransaction } from '../../src/context/TransactionContext';
 import { useSettings } from '../../src/context/SettingsContext';
 import { Colors } from '../../src/theme/Colors';
@@ -8,15 +8,16 @@ import { ArrowUpCircle, ArrowDownCircle, Wallet } from 'lucide-react-native';
 
 export default function StatsScreen() {
   const { transactions } = useTransaction();
-  const { darkMode } = useSettings();
+  const { darkMode, chartType, reportRange } = useSettings();
   const theme = darkMode ? Colors.dark : Colors.light;
   const screenWidth = Dimensions.get('window').width;
   
-  const [range, setRange] = useState('month'); 
+  const [range, setRange] = useState(reportRange || 'month'); 
 
-  const formatVND = (num: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
-  };
+  // Sync with settings when they change
+  useEffect(() => {
+    if (reportRange) setRange(reportRange);
+  }, [reportRange]);
 
   const handlePresetClick = (r: string) => {
     setRange(r);
@@ -31,7 +32,7 @@ export default function StatsScreen() {
         if (!tx.date) return false;
         const txDate = new Date(tx.date);
 
-        if (range === '7days') {
+        if (range === 'week') {
             const sevenDaysAgo = new Date(today);
             sevenDaysAgo.setDate(today.getDate() - 7);
             return txDate >= sevenDaysAgo;
@@ -84,10 +85,64 @@ export default function StatsScreen() {
 
   const ranges = [
     { id: 'all', label: 'Tất cả' },
-    { id: '7days', label: '7 ngày' },
+    { id: 'week', label: 'Tuần' },
     { id: 'month', label: 'Tháng' },
     { id: 'year', label: 'Năm' },
   ];
+
+  const PieCard = () => (
+    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <Text style={[styles.cardTitle, { color: theme.text }]}>Tỷ lệ Thu - Chi</Text>
+      {pieData.length > 0 ? (
+        <PieChart
+            data={pieData}
+            width={screenWidth - 40}
+            height={180}
+            chartConfig={chartConfig}
+            accessor="amount"
+            backgroundColor="transparent"
+            paddingLeft="0"
+            center={[10, 0]}
+            absolute
+        />
+      ) : (
+        <View style={styles.noDataBox}>
+            <Text style={{ color: theme.secondaryText }}>Không có dữ liệu</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const BarCard = () => (
+    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <Text style={[styles.cardTitle, { color: theme.text }]}>Chi tiêu nhiều nhất (k VNĐ)</Text>
+      {barDataValues.length > 0 ? (
+        <BarChart
+          data={{
+            labels: barDataLabels,
+            datasets: [{ data: barDataValues }]
+          }}
+          width={screenWidth - 40}
+          height={220}
+          yAxisLabel=""
+          yAxisSuffix=""
+          chartConfig={{ 
+              ...chartConfig, 
+              color: (opacity = 1) => theme.tint,
+              labelColor: (opacity = 1) => theme.text,
+          }}
+          verticalLabelRotation={0}
+          fromZero
+          showValuesOnTopOfBars
+          style={{ borderRadius: 16, marginTop: 16, marginLeft: -25 }}
+        />
+      ) : (
+        <View style={styles.noDataBox}>
+            <Text style={{ color: theme.secondaryText }}>Chưa có dữ liệu chi tiêu</Text>
+        </View>
+      )}
+    </View>
+  );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -139,57 +194,18 @@ export default function StatsScreen() {
             <Wallet size={32} color={darkMode ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.3)'} />
         </View>
 
-        {/* CHART 1: PIE */}
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>Tỷ lệ Thu - Chi</Text>
-          {pieData.length > 0 ? (
-            <PieChart
-                data={pieData}
-                width={screenWidth - 40}
-                height={180}
-                chartConfig={chartConfig}
-                accessor="amount"
-                backgroundColor="transparent"
-                paddingLeft="0"
-                center={[10, 0]}
-                absolute
-            />
-          ) : (
-            <View style={styles.noDataBox}>
-                <Text style={{ color: theme.secondaryText }}>Không có dữ liệu</Text>
-            </View>
-          )}
-        </View>
-
-        {/* CHART 2: BAR */}
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>Chi tiêu nhiều nhất (k VNĐ)</Text>
-          {barDataValues.length > 0 ? (
-            <BarChart
-              data={{
-                labels: barDataLabels,
-                datasets: [{ data: barDataValues }]
-              }}
-              width={screenWidth - 40}
-              height={220}
-              yAxisLabel=""
-              yAxisSuffix=""
-              chartConfig={{ 
-                  ...chartConfig, 
-                  color: (opacity = 1) => theme.tint,
-                  labelColor: (opacity = 1) => theme.text,
-              }}
-              verticalLabelRotation={0}
-              fromZero
-              showValuesOnTopOfBars
-              style={{ borderRadius: 16, marginTop: 16, marginLeft: -25 }}
-            />
-          ) : (
-            <View style={styles.noDataBox}>
-                <Text style={{ color: theme.secondaryText }}>Chưa có dữ liệu chi tiêu</Text>
-            </View>
-          )}
-        </View>
+        {/* CÁCH HIỂN THỊ BIỂU ĐỒ THEO THỨ TỰ ƯU TIÊN */}
+        {chartType === 'pie' ? (
+          <>
+            <PieCard />
+            <BarCard />
+          </>
+        ) : (
+          <>
+            <BarCard />
+            <PieCard />
+          </>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>

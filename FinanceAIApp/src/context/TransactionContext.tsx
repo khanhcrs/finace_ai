@@ -5,7 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     ShoppingBag, Coffee, Car, DollarSign, Utensils,
     Home, Tv, Briefcase, HelpCircle, Zap, Heart,
-    Bus, Film, BookOpen, GraduationCap
+    Bus, Film, BookOpen, GraduationCap,
+    Plane, Gift, Stethoscope, PawPrint
 } from 'lucide-react-native';
 import { API_BASE_URL } from '../api/config';
 
@@ -25,6 +26,7 @@ export type Category = {
     name: string;
     icon: string;
     type: 'INCOME' | 'EXPENSE';
+    limitAmount: number | null;
 };
 
 type TransactionContextType = {
@@ -34,7 +36,7 @@ type TransactionContextType = {
     addTransaction: (newTx: any) => Promise<boolean>;
     updateTransaction: (id: number, updatedTx: any) => Promise<boolean>;
     deleteTransaction: (id: number) => Promise<boolean>;
-    fetchData: () => Promise<void>;
+    fetchData: (silent?: boolean) => Promise<void>;
 };
 
 const TransactionContext = createContext<TransactionContextType | undefined>(undefined);
@@ -54,7 +56,11 @@ const ICON_MAP: Record<string, any> = {
     'Briefcase': Briefcase,
     'BookOpen': BookOpen,
     'GraduationCap': GraduationCap,
-    'HelpCircle': HelpCircle
+    'HelpCircle': HelpCircle,
+    'Plane': Plane,
+    'Gift': Gift,
+    'Stethoscope': Stethoscope,
+    'PawPrint': PawPrint
 };
 
 const API_TX_URL = `${API_BASE_URL}/transactions`;
@@ -75,10 +81,10 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
         }
     };
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (silent: boolean = false) => {
         const userId = await getUserId();
         try {
-            setIsLoading(true);
+            if (!silent) setIsLoading(true);
             const [catRes, txRes] = await Promise.all([
                 axios.get(`${API_CAT_URL}/user/${userId}`),
                 axios.get(`${API_TX_URL}/user/${userId}`)
@@ -116,7 +122,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
         } catch (error) {
             console.error("Lỗi khi tải dữ liệu:", error);
         } finally {
-            setIsLoading(false);
+            if (!silent) setIsLoading(false);
         }
     }, []);
 
@@ -184,7 +190,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
 
             const response = await axios.post(API_TX_URL, dataToSend);
             if (response.status === 200 || response.status === 201) {
-                await fetchData(); // Cập nhật lại danh sách ngay lập tức
+                await fetchData(true); // Cập nhật lại danh sách ngay lập tức (ngầm)
                 return true;
             }
             return false;
@@ -207,7 +213,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
             };
 
             await axios.put(`${API_TX_URL}/${id}`, dataToSend);
-            await fetchData();
+            await fetchData(true);
             return true;
         } catch (error) {
             console.error("Lỗi khi cập nhật giao dịch:", error);
@@ -218,7 +224,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     const deleteTransaction = async (id: number) => {
         try {
             await axios.delete(`${API_TX_URL}/${id}`);
-            await fetchData();
+            await fetchData(true);
             return true;
         } catch (error) {
             console.error("Lỗi khi xóa giao dịch:", error);

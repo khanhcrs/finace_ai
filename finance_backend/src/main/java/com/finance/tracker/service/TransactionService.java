@@ -25,6 +25,9 @@ public class TransactionService {
     @Autowired
     private com.finance.tracker.repository.CategoryRepository categoryRepository;
 
+    @Autowired
+    private NotificationService notificationService;
+
     public Transaction saveTransaction(Transaction transaction) {
         User user = null;
         if (transaction.getUser() != null && transaction.getUser().getId() != null) {
@@ -36,32 +39,34 @@ public class TransactionService {
         if (transaction.getAmount() != null && "EXPENSE".equalsIgnoreCase(transaction.getType()) && user != null) {
             double amt = transaction.getAmount().doubleValue();
             String catName = "";
+            Double catLimit = null;
             
-            // Lấy tên danh mục để kiểm tra
+            // Lấy thông tin danh mục từ DB để có dữ liệu mới nhất (bao gồm cả limitAmount)
             if (transaction.getCategory() != null && transaction.getCategory().getId() != null) {
-                catName = categoryRepository.findById(transaction.getCategory().getId())
-                            .map(c -> c.getName()).orElse("");
+                com.finance.tracker.model.Category dbCategory = categoryRepository.findById(transaction.getCategory().getId()).orElse(null);
+                if (dbCategory != null) {
+                    catName = dbCategory.getName();
+                    catLimit = dbCategory.getLimitAmount();
+                }
             }
 
             boolean isAnomaly = false;
+            String reason = "";
             
-            // Lấy ngưỡng từ User (nếu null thì dùng mặc định)
-            double tEating = user.getThresholdEating() != null ? user.getThresholdEating() : 500000.0;
-            double tShopping = user.getThresholdShopping() != null ? user.getThresholdShopping() : 5000000.0;
-            double tTransport = user.getThresholdTransport() != null ? user.getThresholdTransport() : 2000000.0;
-            double tOthers = user.getThresholdOthers() != null ? user.getThresholdOthers() : 1000000.0;
-
-            if (catName.contains("Ăn uống") && amt >= tEating) {
+            // Chỉ kiểm tra hạn mức RIÊNG của danh mục
+            if (catLimit != null && amt >= catLimit) {
                 isAnomaly = true;
-            } else if (catName.contains("Mua sắm") && amt >= tShopping) {
-                isAnomaly = true;
-            } else if (catName.contains("Di chuyển") || catName.contains("Đi lại") && amt >= tTransport) {
-                isAnomaly = true;
-            } else if (amt >= tOthers) {
-                isAnomaly = true;
+                reason = "Vượt hạn mức danh mục " + catName + " (" + String.format("%,.0f", catLimit) + "đ)";
             }
             
             transaction.setIsAnomaly(isAnomaly);
+
+            // Gửi thông báo ngay lập tức nếu là bất thường (vượt hạn mức danh mục)
+            if (isAnomaly) {
+                String title = "Cảnh báo chi tiêu!";
+                String body = "Bạn vừa ghi nhận khoản chi " + String.format("%,.0f", amt) + "đ. " + reason;
+                notificationService.createNotification(user, title, body);
+            }
         }
 
         return transactionRepository.save(transaction);
