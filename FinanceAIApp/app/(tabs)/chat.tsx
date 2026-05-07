@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert } from 'react-native';
 import { useTransaction } from '../../src/context/TransactionContext';
 import { useSettings } from '../../src/context/SettingsContext';
 import { Colors } from '../../src/theme/Colors';
-import { Send, Image as ImageIcon } from 'lucide-react-native';
+import { Send, Image as ImageIcon, Loader2, MessageSquare } from 'lucide-react-native';
 import axios from 'axios';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,16 +27,10 @@ export default function ChatScreen() {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  
-  // NEW: Trạng thái lưu giao dịch đang bị nghi ngờ (bất thường)
-  const [pendingTx, setPendingTx] = useState<any>(null);
-
-  // Trạng thái giữ giao dịch đang bị nghi ngờ (bất thường)
   const [pendingTx, setPendingTx] = useState<any>(null);
 
   const flatListRef = useRef<FlatList>(null);
 
-  // LUỒNG 1: XỬ LÝ CHAT & CẢNH BÁO BẤT THƯỜNG (Từ Code 1)
   const handleSend = async () => {
     if (!input.trim()) return;
 
@@ -45,7 +39,7 @@ export default function ChatScreen() {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
-    setPendingTx(null); // Reset pending mỗi lần chat mới
+    setPendingTx(null);
 
     try {
       const savedUserId = await AsyncStorage.getItem('finance_user_id') || '1';
@@ -57,61 +51,60 @@ export default function ChatScreen() {
         }
       });
 
-      const { reply, transaction, saved } = response.data;
-
-      if (saved) {
-        fetchData(true);
-      }
+      const { reply, transaction } = response.data;
 
       if (transaction) {
         if (transaction.isAnomaly) {
-          // NẾU BẤT THƯỜNG -> AI CHỈ HỎI LẠI, CHỜ XÁC NHẬN
-          const aiText = transaction.botMessage || transaction.note || "Hệ thống phát hiện khoản chi này có vẻ bất thường. Bạn có chắc chắn muốn lưu không?";
+          const aiText = reply || "Khoản chi này có vẻ bất thường. Bạn có muốn lưu không?";
+          
           const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: aiText };
           setMessages(prev => [...prev, aiMsg]);
-
-          // Bật bảng chờ xác nhận
           setPendingTx(transaction);
         } else {
-          // NẾU BÌNH THƯỜNG -> LƯU LUÔN
           const aiText = transaction.botMessage || reply || "Đã ghi chép giao dịch thành công!";
           const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: aiText };
           setMessages(prev => [...prev, aiMsg]);
-
-          fetchData(true);
+          fetchData(); 
         }
       } else {
-        // Chat bình thường không phải giao dịch
-        const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: reply || "Đã xử lý xong yêu cầu của bạn!" };
+        const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: reply || "Đã xử lý xong!" };
         setMessages(prev => [...prev, aiMsg]);
       }
     } catch (error) {
-      console.error(error);
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'ai',
-        text: "❌ Máy chủ AI đang bận hoặc có lỗi kết nối."
-      };
+      const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: "❌ Máy chủ AI đang bận hoặc lỗi kết nối." };
       setMessages(prev => [...prev, aiMsg]);
     } finally {
       setIsTyping(false);
     }
   };
 
+  // HÀM SOÁT LỖI GÓI HÀNG Ở ĐÂY
   const handleConfirmSave = async () => {
     if (!pendingTx) return;
     try {
       const savedUserId = await AsyncStorage.getItem('finance_user_id') || '1';
-      // Ép buộc lưu với isAnomaly = false
-      await axios.post(`${API_BASE_URL}/transactions`, { ...pendingTx, isAnomaly: false, userId: savedUserId });
+      
+      const dataToSend = { ...pendingTx, isAnomaly: false, userId: savedUserId };
+      
+      console.log("==== GÓI HÀNG CHUẨN BỊ GỬI LÊN BACKEND ====");
+      console.log(JSON.stringify(dataToSend, null, 2));
+      console.log("============================================");
 
+      await axios.post(`${API_BASE_URL}/transactions`, dataToSend);
+      
       const aiMsg: Message = { id: Date.now().toString(), sender: 'ai', text: "✅ Đã lưu khoản chi đặc biệt này vào sổ!" };
       setMessages(prev => [...prev, aiMsg]);
-
+      
       setPendingTx(null);
-      fetchData(true);
+      fetchData();
     } catch (error) {
-      Alert.alert("Lỗi", "Không thể lưu giao dịch lúc này.");
+      console.log("==== LÝ DO BACKEND TỪ CHỐI ====");
+      if (axios.isAxiosError(error)) {
+        console.log(error.response?.data);
+      } else {
+        console.log(error);
+      }
+      Alert.alert("Lỗi 400", "Bạn hãy xem log ở màn hình máy tính nhé!");
     }
   };
 
@@ -121,96 +114,38 @@ export default function ChatScreen() {
     setMessages(prev => [...prev, aiMsg]);
   };
 
-  // LUỒNG 2: XỬ LÝ CHỌN ẢNH NÂNG CAO (Từ Code 2)
-  const handleImagePicker = async () => {
-    Alert.alert(
-      "Thêm hóa đơn",
-      "Bạn muốn chụp ảnh mới hay chọn từ thư viện?",
-      [
-        {
-          text: "Chụp ảnh",
-          onPress: async () => {
-            const { status } = await ImagePicker.requestCameraPermissionsAsync();
-            if (status !== 'granted') {
-              Alert.alert("Lỗi", "Bạn cần cho phép truy cập máy ảnh để sử dụng tính năng này!");
-              return;
-            }
-            const result = await ImagePicker.launchCameraAsync({
-              allowsEditing: true,
-              quality: 0.8,
-            });
-            if (!result.canceled) {
-              handleImageUpload(result.assets[0].uri);
-            }
-          }
-        },
-        {
-          text: "Chọn từ thư viện",
-          onPress: async () => {
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: true,
-              quality: 0.8,
-            });
-            if (!result.canceled) {
-              handleImageUpload(result.assets[0].uri);
-            }
-          }
-        },
-        {
-          text: "Hủy",
-          style: "cancel"
-        }
-      ]
-    );
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      handleImageUpload(result.assets[0].uri);
+    }
   };
 
   const handleImageUpload = async (uri: string) => {
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      sender: 'user',
-      text: "📷 [Đã gửi một ảnh hóa đơn]",
-      image: uri
-    };
+    const userMsg: Message = { id: Date.now().toString(), sender: 'user', text: "📷 [Đã gửi ảnh]", image: uri };
     setMessages(prev => [...prev, userMsg]);
     setIsUploading(true);
 
     try {
       const savedUserId = await AsyncStorage.getItem('finance_user_id') || '1';
-
       const formData = new FormData();
       // @ts-ignore
-      formData.append('file', {
-        uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
-        type: 'image/jpeg',
-        name: 'receipt.jpg',
-      });
+      formData.append('file', { uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri, type: 'image/jpeg', name: 'receipt.jpg' });
       formData.append('userId', savedUserId);
 
-      const response = await axios.post(`${API_BASE_URL}/ai/process-receipt`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await axios.post(`${API_BASE_URL}/ai/process-receipt`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 
-      const transaction = response.data;
-      if (transaction) {
-        const amountFormatted = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(transaction.amount);
-        const aiMsg: Message = {
-          id: (Date.now() + 1).toString(),
-          sender: 'ai',
-          text: `✅ Mình đã đọc xong hóa đơn!\n\n**Nội dung:** ${transaction.note}\n**Số tiền:** ${amountFormatted}\n**Danh mục:** ${transaction.category?.name || 'Khác'}\n\nĐã lưu vào lịch sử giao dịch của bạn.`
-        };
+      if (response.data) {
+        const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: `✅ Đã quét hóa đơn và lưu thành công!` };
         setMessages(prev => [...prev, aiMsg]);
-        fetchData(true);
+        fetchData();
       }
     } catch (error) {
-      console.error(error);
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'ai',
-        text: "❌ Xin lỗi, mình không thể đọc được hóa đơn này. Bạn hãy thử chụp rõ hơn nhé!"
-      };
+      const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: "❌ Lỗi đọc ảnh." };
       setMessages(prev => [...prev, aiMsg]);
     } finally {
       setIsUploading(false);
@@ -219,17 +154,9 @@ export default function ChatScreen() {
 
   const renderItem = ({ item }: { item: Message }) => (
     <View style={[styles.messageWrapper, item.sender === 'user' ? styles.userWrapper : styles.aiWrapper]}>
-      <View style={[
-        styles.messageBubble,
-        item.sender === 'user'
-          ? [styles.userBubble, { backgroundColor: theme.tint === '#000' ? '#000' : '#fff' }]
-          : [styles.aiBubble, { backgroundColor: theme.card, borderColor: theme.border }]
-      ]}>
+      <View style={[styles.messageBubble, item.sender === 'user' ? [styles.userBubble, { backgroundColor: theme.tint === '#000' ? '#000' : '#fff' }] : [styles.aiBubble, { backgroundColor: theme.card, borderColor: theme.border }]]}>
         {item.image && <Image source={{ uri: item.image }} style={styles.messageImage} />}
-        <Text style={[
-          styles.messageText,
-          { color: item.sender === 'user' ? (theme.tint === '#000' ? '#fff' : '#000') : theme.text }
-        ]}>
+        <Text style={[styles.messageText, { color: item.sender === 'user' ? (theme.tint === '#000' ? '#fff' : '#000') : theme.text }]}>
           {item.text.replace(/\*\*(.*?)\*\*/g, '$1')}
         </Text>
       </View>
@@ -238,74 +165,33 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+        <FlatList ref={flatListRef} data={messages} renderItem={renderItem} keyExtractor={item => item.id} contentContainerStyle={styles.listContent} onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })} />
 
         {(isTyping || isUploading) && (
           <View style={styles.typingContainer}>
             <View style={[styles.typingBubble, { backgroundColor: theme.card }]}>
               <ActivityIndicator size="small" color={theme.tint} />
-              <Text style={[styles.typingText, { color: theme.secondaryText }]}>
-                {isUploading ? "AI đang phân tích..." : "AI đang nghĩ..."}
-              </Text>
+              <Text style={[styles.typingText, { color: theme.secondaryText }]}>{isUploading ? "AI đang phân tích..." : "AI đang nghĩ..."}</Text>
             </View>
           </View>
         )}
 
-        {/* KHUNG HIỂN THỊ XÁC NHẬN GIAO DỊCH BẤT THƯỜNG */}
         {pendingTx && (
           <View style={[styles.confirmBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Text style={[styles.confirmTitle, { color: theme.text }]}>
-              ⚠️ Đang chờ xác nhận khoản chi lớn
-            </Text>
+            <Text style={[styles.confirmTitle, { color: theme.text }]}>⚠️ Đang chờ xác nhận khoản chi</Text>
             <View style={styles.btnRow}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelSave}>
-                <Text style={styles.btnText}>Hủy bỏ</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirmSave}>
-                <Text style={styles.btnText}>Vẫn Lưu</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelSave}><Text style={styles.btnText}>Hủy bỏ</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirmSave}><Text style={styles.btnText}>Vẫn Lưu</Text></TouchableOpacity>
             </View>
           </View>
         )}
 
         <View style={[styles.inputArea, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
-          <TouchableOpacity
-            style={[styles.iconButton, { backgroundColor: theme.card }]}
-            onPress={handleImagePicker}
-            disabled={isTyping || isUploading || pendingTx !== null}
-          >
-            <ImageIcon size={22} color={theme.secondaryText} />
-          </TouchableOpacity>
-
+          <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.card }]} onPress={pickImage} disabled={isTyping || isUploading || pendingTx !== null}><ImageIcon size={22} color={theme.secondaryText} /></TouchableOpacity>
           <View style={[styles.inputContainer, { backgroundColor: theme.card }]}>
-            <TextInput
-              style={[styles.input, { color: theme.text }]}
-              placeholder="Nhập nội dung..."
-              placeholderTextColor={theme.secondaryText}
-              value={input}
-              onChangeText={setInput}
-              multiline
-              editable={pendingTx === null}
-            />
-            <TouchableOpacity
-              style={[styles.sendButton, { backgroundColor: theme.tint === '#000' ? '#000' : '#fff', opacity: (!input.trim() || pendingTx !== null) ? 0.5 : 1 }]}
-              onPress={handleSend}
-              disabled={!input.trim() || isTyping || isUploading || pendingTx !== null}
-            >
-              <Send size={18} color={theme.tint === '#000' ? '#fff' : '#000'} />
-            </TouchableOpacity>
+            <TextInput style={[styles.input, { color: theme.text }]} placeholder="Nhập nội dung..." placeholderTextColor={theme.secondaryText} value={input} onChangeText={setInput} multiline editable={pendingTx === null} />
+            <TouchableOpacity style={[styles.sendButton, { backgroundColor: theme.tint === '#000' ? '#000' : '#fff', opacity: (!input.trim() || pendingTx !== null) ? 0.5 : 1 }]} onPress={handleSend} disabled={!input.trim() || isTyping || isUploading || pendingTx !== null}><Send size={18} color={theme.tint === '#000' ? '#fff' : '#000'} /></TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -332,47 +218,10 @@ const styles = StyleSheet.create({
   inputContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 22, paddingHorizontal: 4, minHeight: 44 },
   input: { flex: 1, paddingHorizontal: 12, fontSize: 15, maxHeight: 100 },
   sendButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', margin: 4 },
-
-  // STYLE CHO KHUNG XÁC NHẬN BẤT THƯỜNG
-  confirmBox: {
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  confirmTitle: {
-    marginBottom: 12,
-    textAlign: 'center',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  btnRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  confirmBtn: {
-    backgroundColor: '#10B981',
-    paddingVertical: 10,
-    borderRadius: 8,
-    flex: 0.48,
-    alignItems: 'center',
-  },
-  cancelBtn: {
-    backgroundColor: '#EF4444',
-    paddingVertical: 10,
-    borderRadius: 8,
-    flex: 0.48,
-    alignItems: 'center',
-  },
-  btnText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 15,
-  }
+  confirmBox: { padding: 16, marginHorizontal: 16, marginBottom: 12, borderRadius: 16, borderWidth: 1, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  confirmTitle: { marginBottom: 12, textAlign: 'center', fontWeight: '700', fontSize: 14 },
+  btnRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  confirmBtn: { backgroundColor: '#10B981', paddingVertical: 10, borderRadius: 8, flex: 0.48, alignItems: 'center' },
+  cancelBtn: { backgroundColor: '#EF4444', paddingVertical: 10, borderRadius: 8, flex: 0.48, alignItems: 'center' },
+  btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 15 }
 });

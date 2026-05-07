@@ -19,7 +19,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ai")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "*") // Đã mở cho mọi frontend
 public class AiController {
 
     @Autowired
@@ -38,7 +38,7 @@ public class AiController {
     private NotificationService notificationService;
 
     // ==========================================
-    // 1. XỬ LÝ TEXT CHAT (Gộp logic Bản 2 + Tự tạo danh mục Bản 1)
+    // 1. XỬ LÝ CHAT TỔNG HỢP (THÊM GIAO DỊCH & HỎI ĐÁP)
     // ==========================================
     @GetMapping("/process")
     public ResponseEntity<?> process(
@@ -46,45 +46,59 @@ public class AiController {
             @RequestParam(value = "userId", defaultValue = "1") Long userId) {
 
         try {
-            List<Transaction> transactions = geminiService.processTransaction(text);
+            // Lấy lịch sử giao dịch cung cấp cho AI
+            List<Transaction> userHistory = transactionRepository.findAll().stream()
+                    .filter(t -> t.getUser() != null && t.getUser().getId().equals(userId))
+                    .toList();
+
+            List<Transaction> transactions = geminiService.processChat(text, userHistory);
 
             if (transactions != null && !transactions.isEmpty()) {
 
-                if (transactions.size() == 1 && transactions.get(0).getNote() != null
-                        && transactions.get(0).getNote().startsWith("ERROR|")) {
-                    return ResponseEntity
-                            .ok(Map.of("mustConfirm", false, "reply", transactions.get(0).getNote().split("\\|")[1]));
+                // Xử lý Lỗi API (hết hạn mức, quá tải)
+                if (transactions.size() == 1 && transactions.get(0).getNote() != null && transactions.get(0).getNote().startsWith("ERROR|")) {
+                    return ResponseEntity.ok(Map.of("mustConfirm", false, "reply", transactions.get(0).getNote().split("\\|")[1]));
                 }
 
+                // 🌟 BẮT LUỒNG TÂM SỰ / PHÂN TÍCH (Không lưu vào DB)
+                if (transactions.size() == 1 && "CHAT".equals(transactions.get(0).getType())) {
+                    String noteContent = transactions.get(0).getNote();
+                    String aiReply = noteContent.startsWith("CHAT|") ? noteContent.substring(5).trim() : noteContent;
+                    return ResponseEntity.ok(Map.of("mustConfirm", false, "saved", false, "reply", aiReply));
+                }
+
+                // 🌟 BẮT LUỒNG GHI CHÉP GIAO DỊCH
                 User user = userRepository.findById(userId).orElse(null);
                 Transaction anomalyTx = null;
                 String anomalyReasonForChat = "";
-
                 StringBuilder replyMsg = new StringBuilder("✅ **Đã ghi chép:**\n");
                 boolean hasNormalTx = false;
 
                 for (Transaction transaction : transactions) {
+                    if (transaction.getAmount() == null || transaction.getAmount().compareTo(BigDecimal.ZERO) == 0) continue;
+
                     String[] parts = transaction.getNote().split("\\|");
                     String categoryName = parts[0].trim();
                     String realNote = parts.length > 1 ? parts[1].trim() : categoryName;
-
-                    // BÓC TÁCH LÝ DO BẤT THƯỜNG (Từ Bản 2)
+                    String botMessage = "";
+                    int botIdx = realNote.indexOf(" _BOTMSG_");
+                    if (botIdx != -1) {
+                        botMessage = realNote.substring(botIdx + 9).trim();
+                        realNote = realNote.substring(0, botIdx).trim();
+                    }
+                    // Bóc lý do bất thường
                     String reason = "";
-                    int idx = realNote.lastIndexOf(" [");
-                    if (idx != -1 && realNote.endsWith("]")) {
-                        reason = realNote.substring(idx);
+                    int idx = realNote.indexOf(" _REASON_");
+                    if (idx != -1) {
+                        reason = realNote.substring(idx + 9).trim(); 
                         realNote = realNote.substring(0, idx).trim();
                     }
 
-                    // 🔥 TỰ ĐỘNG TẠO DANH MỤC NẾU CHƯA CÓ (Từ Bản 1)
+                    // Tìm hoặc Tạo mới danh mục
                     Category category = null;
                     if (user != null) {
                         List<Category> userCategories = categoryRepository.findByUserId(userId);
-                        category = userCategories.stream()
-                                .filter(c -> c.getName().equalsIgnoreCase(categoryName))
-                                .findFirst()
-                                .orElse(null);
-
+                        category = userCategories.stream().filter(c -> c.getName().equalsIgnoreCase(categoryName)).findFirst().orElse(null);
                         if (category == null && !categoryName.isEmpty()) {
                             category = new Category();
                             category.setName(categoryName);
@@ -94,61 +108,49 @@ public class AiController {
                             category = categoryRepository.save(category);
                         }
                     }
-
-                    // Fallback an toàn
                     if (category == null) {
-                        category = categoryRepository.findByName(categoryName)
-                                .orElseGet(() -> categoryRepository.findById(1L).orElse(null));
+                        category = categoryRepository.findByName(categoryName).orElseGet(() -> categoryRepository.findById(1L).orElse(null));
                     }
 
                     transaction.setCategory(category);
                     transaction.setNote(realNote);
                     transaction.setUser(user);
 
+                    // Xử lý báo cáo bất thường
                     if (transaction.getIsAnomaly() != null && transaction.getIsAnomaly()) {
                         if (anomalyTx == null) {
                             anomalyTx = transaction;
                             anomalyReasonForChat = reason;
                         }
-                    } else {
-                        // Bỏ qua nếu số tiền = 0 (Từ Bản 1)
-                        if (transaction.getAmount() == null
-                                || transaction.getAmount().compareTo(BigDecimal.ZERO) == 0) {
-                            continue;
-                        }
-
+                   } else {
                         Transaction saved = transactionRepository.save(transaction);
                         String loai = saved.getType().equals("INCOME") ? "Thu" : "Chi";
-                        String formattedAmount = new java.text.DecimalFormat("#,###").format(saved.getAmount())
-                                .replace(",", ".");
+                        String formattedAmount = new java.text.DecimalFormat("#,###").format(saved.getAmount()).replace(",", ".");
+                        
+                        if (!botMessage.isEmpty() && !replyMsg.toString().contains(botMessage)) {
+                            replyMsg.insert(0, "💬 " + botMessage + "\n\n");
+                        }
+                        
                         replyMsg.append(String.format("- %s: %sđ (%s)\n", loai, formattedAmount, saved.getNote()));
                         hasNormalTx = true;
                     }
                 }
 
                 if (anomalyTx != null) {
-                    String warnText = (hasNormalTx ? replyMsg.toString() + "\n" : "") +
-                            "⚠️ **Tuy nhiên, phát hiện khoản chi tiêu lớn:** " + anomalyTx.getNote()
-                            + anomalyReasonForChat;
-
-                    return ResponseEntity.ok(Map.of(
-                            "mustConfirm", true,
-                            "transaction", anomalyTx,
-                            "reply", warnText));
+                    String warnText = (anomalyReasonForChat != null && !anomalyReasonForChat.isEmpty()) 
+                                      ? "🤔 " + anomalyReasonForChat 
+                                      : "⚠️ Khoản chi này có vẻ hơi lớn. Bạn có gõ nhầm số không?";
+                                      
+                    return ResponseEntity.ok(Map.of("mustConfirm", true, "transaction", anomalyTx, "reply", warnText));
                 }
 
                 if (!hasNormalTx) {
-                    return ResponseEntity.ok(Map.of("mustConfirm", false, "reply",
-                            "Đã nhận thông tin, nhưng không có khoản tiền hợp lệ nào để lưu."));
+                    return ResponseEntity.ok(Map.of("mustConfirm", false, "reply", "Đã hiểu ý bạn nhưng không có khoản tiền hợp lệ nào để lưu."));
                 }
 
-                return ResponseEntity.ok(Map.of(
-                        "mustConfirm", false,
-                        "saved", true,
-                        "reply", replyMsg.toString()));
+                return ResponseEntity.ok(Map.of("mustConfirm", false, "saved", true, "reply", replyMsg.toString()));
             }
-            return ResponseEntity.badRequest()
-                    .body(Map.of("reply", "AI không tìm thấy giao dịch nào hợp lệ trong câu của bạn."));
+            return ResponseEntity.badRequest().body(Map.of("reply", "AI không tìm thấy thông tin hợp lệ. Bạn hãy thử nói rõ hơn nhé."));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).body(Map.of("reply", "Lỗi Server: " + e.getMessage()));
@@ -156,12 +158,10 @@ public class AiController {
     }
 
     // ==========================================
-    // 2. LƯU GIAO DỊCH BẤT THƯỜNG ĐÃ XÁC NHẬN (Từ Bản 2)
+    // 2. LƯU GIAO DỊCH ĐÃ XÁC NHẬN (CẢNH BÁO AI)
     // ==========================================
     @PostMapping("/save-confirmed")
-    public ResponseEntity<?> saveConfirmed(
-            @RequestBody Transaction transaction,
-            @RequestParam("userId") Long userId) {
+    public ResponseEntity<?> saveConfirmed(@RequestBody Transaction transaction, @RequestParam("userId") Long userId) {
         try {
             User user = userRepository.findById(userId).orElse(null);
             transaction.setUser(user);
@@ -173,7 +173,6 @@ public class AiController {
 
             Transaction saved = transactionRepository.save(transaction);
 
-            // Bổ sung: Tạo thông báo khi lưu giao dịch bất thường từ AI
             if (Boolean.TRUE.equals(saved.getIsAnomaly()) && saved.getUser() != null) {
                 notificationService.createNotification(
                         saved.getUser(),
@@ -188,8 +187,7 @@ public class AiController {
     }
 
     // ==========================================
-    // 3. XỬ LÝ HÓA ĐƠN BẰNG HÌNH ẢNH (Từ Bản 1, trả về dạng ResponseEntity cho đồng
-    // nhất)
+    // 3. XỬ LÝ HÓA ĐƠN BẰNG HÌNH ẢNH
     // ==========================================
     @PostMapping(value = "/process-receipt", consumes = { "multipart/form-data" })
     public ResponseEntity<?> processReceipt(
@@ -198,7 +196,6 @@ public class AiController {
 
         try {
             Transaction transaction = geminiService.processReceiptImage(file);
-
             if (transaction != null) {
                 String[] parts = transaction.getNote().split("\\|");
                 String categoryName = parts[0].trim();
@@ -210,12 +207,7 @@ public class AiController {
                 Category category = null;
                 if (user != null) {
                     List<Category> userCategories = categoryRepository.findByUserId(userId);
-                    category = userCategories.stream()
-                            .filter(c -> c.getName().equalsIgnoreCase(categoryName))
-                            .findFirst()
-                            .orElse(null);
-
-                    // 🔥 TỰ TẠO DANH MỤC TỪ HÓA ĐƠN
+                    category = userCategories.stream().filter(c -> c.getName().equalsIgnoreCase(categoryName)).findFirst().orElse(null);
                     if (category == null && !categoryName.isEmpty()) {
                         category = new Category();
                         category.setName(categoryName);
@@ -225,10 +217,8 @@ public class AiController {
                         category = categoryRepository.save(category);
                     }
                 }
-
                 if (category == null) {
-                    category = categoryRepository.findByName(categoryName)
-                            .orElseGet(() -> categoryRepository.findById(1L).orElse(null));
+                    category = categoryRepository.findByName(categoryName).orElseGet(() -> categoryRepository.findById(1L).orElse(null));
                 }
 
                 transaction.setCategory(category);
@@ -242,34 +232,5 @@ public class AiController {
             e.printStackTrace();
             return ResponseEntity.status(500).body("Lỗi hệ thống: " + e.getMessage());
         }
-    }
-
-    // ==========================================
-    // 4. PHÂN TÍCH CHI TIÊU & HỎI ĐÁP (Từ Bản 2)
-    // ==========================================
-    @GetMapping("/analyze")
-    public String analyzeSpending(@RequestParam(value = "userId", defaultValue = "1") Long userId) {
-        List<Transaction> userTransactions = transactionRepository.findAll().stream()
-                .filter(t -> t.getUser() != null && t.getUser().getId().equals(userId))
-                .toList();
-        return geminiService.analyzeSpending(userTransactions);
-    }
-
-    @GetMapping("/ask")
-    public ResponseEntity<?> askQuestion(@RequestParam("text") String text,
-            @RequestParam(value = "userId", defaultValue = "1") Long userId) {
-        List<Transaction> userTransactions = transactionRepository.findAll().stream()
-                .filter(t -> t.getUser() != null && t.getUser().getId().equals(userId))
-                .toList();
-
-        StringBuilder history = new StringBuilder();
-        for (Transaction t : userTransactions) {
-            String loai = "INCOME".equalsIgnoreCase(t.getType()) ? "Thu" : "Chi";
-            String categoryName = t.getCategory() != null ? t.getCategory().getName() : "Khác";
-            history.append(String.format("- Ngày %s: %s %sđ cho %s (Danh mục: %s)\n",
-                    t.getTransactionDate(), loai, t.getAmount(), t.getNote(), categoryName));
-        }
-
-        return ResponseEntity.ok(Map.of("reply", geminiService.answerQuestion(text, history.toString())));
     }
 }
