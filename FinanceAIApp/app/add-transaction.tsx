@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, ScrollView, Switch, Alert } from 'react-native';
 import { useTransaction } from '../src/context/TransactionContext';
 import { useSettings } from '../src/context/SettingsContext';
@@ -17,6 +17,37 @@ export default function AddTransactionScreen() {
   const [isIncome, setIsIncome] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // --- SMART AUTO-SWITCH LOGIC ---
+  useEffect(() => {
+    if (!title) return;
+
+    const note = title.toLowerCase();
+
+    // Từ khóa đặc trưng cho Chi tiêu
+    const expenseKeywords = [
+      'ăn', 'uống', 'mua', 'chi', 'trả', 'xăng', 'điện', 'nước',
+      'học phí', 'vặt', 'cafe', 'phở', 'bún', 'cơm', 'trưa', 'tối', 'sáng',
+      'siêu thị', 'shopee', 'lazada', 'tiki', 'grab', 'be', 'gojek'
+    ];
+
+    // Từ khóa đặc trưng cho Thu nhập
+    const incomeKeywords = [
+      'lương', 'thưởng', 'nhận', 'lãi', 'quà', 'được cho',
+      'mẹ cho', 'ba cho', 'bán', 'hoàn tiền', 'đòi nợ'
+    ];
+
+    const isExpenseNote = expenseKeywords.some(keyword => note.includes(keyword));
+    const isIncomeNote = incomeKeywords.some(keyword => note.includes(keyword));
+
+    if (isExpenseNote && isIncome) {
+      setIsIncome(false);
+      setSelectedCategoryId(null);
+    } else if (isIncomeNote && !isIncome) {
+      setIsIncome(true);
+      setSelectedCategoryId(null);
+    }
+  }, [title]);
 
   const handleSave = async () => {
     if (!title || !amount || isSubmitting) return;
@@ -88,8 +119,8 @@ export default function AddTransactionScreen() {
           <Switch
             value={isIncome}
             onValueChange={(val) => {
-                setIsIncome(val);
-                setSelectedCategoryId(null);
+              setIsIncome(val);
+              setSelectedCategoryId(null);
             }}
             trackColor={{ false: '#767577', true: theme.success }}
           />
