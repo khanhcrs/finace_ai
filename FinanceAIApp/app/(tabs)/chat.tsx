@@ -152,6 +152,46 @@ export default function ChatScreen() {
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.8 });
     if (!result.canceled) handleImageUpload(result.assets[0].uri);
+    Alert.alert(
+      "Chọn ảnh hóa đơn",
+      "Bạn muốn chụp ảnh mới hay chọn từ thư viện?",
+      [
+        {
+          text: "Chụp ảnh",
+          onPress: async () => {
+            const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+            if (permissionResult.granted === false) {
+              Alert.alert("Lỗi", "Bạn cần cấp quyền truy cập camera để sử dụng tính năng này!");
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              allowsEditing: true,
+              quality: 0.8,
+            });
+            if (!result.canceled) {
+              handleImageUpload(result.assets[0].uri);
+            }
+          }
+        },
+        {
+          text: "Chọn từ thư viện",
+          onPress: async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              quality: 0.8,
+            });
+            if (!result.canceled) {
+              handleImageUpload(result.assets[0].uri);
+            }
+          }
+        },
+        {
+          text: "Hủy",
+          style: "cancel"
+        }
+      ]
+    );
   };
 
   const handleImageUpload = async (uri: string) => {
