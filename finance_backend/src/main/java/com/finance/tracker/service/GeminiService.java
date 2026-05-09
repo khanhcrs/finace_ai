@@ -212,4 +212,37 @@ public class GeminiService {
             return null;
         }
     }
+        public String transcribeAudio(MultipartFile file) {
+        try {
+            byte[] bytes = file.getBytes();
+            String base64Audio = Base64.getEncoder().encodeToString(bytes);
+            String mimeType = file.getContentType();
+            
+            // Đảm bảo mimeType chuẩn cho audio
+            if (mimeType == null || !mimeType.startsWith("audio/")) {
+                mimeType = "audio/mp4"; // Thường React Native lưu m4a dưới dạng mp4 container
+            }
+
+            // Prompt đơn giản, ép AI làm người chép chính tả
+            String promptText = "Bạn là một trợ lý nhận diện giọng nói. Hãy nghe đoạn âm thanh này và chuyển nó thành văn bản tiếng Việt một cách chính xác nhất. CHỈ TRẢ VỀ ĐOẠN VĂN BẢN ĐÓ, tuyệt đối không thêm lời chào, không giải thích, không dùng ngoặc kép.";
+
+            Map<String, Object> inlineData = Map.of("mime_type", mimeType, "data", base64Audio);
+            Map<String, Object> audioPart = Map.of("inline_data", inlineData);
+            Map<String, Object> textPart = Map.of("text", promptText);
+            Map<String, Object> body = Map.of("contents", List.of(Map.of("parts", List.of(textPart, audioPart))));
+
+            String response = webClient.post()
+                    .uri(uriBuilder -> uriBuilder.path("/v1beta/models/gemini-2.5-flash:generateContent").queryParam("key", apiKey).build())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .retrieve().bodyToMono(String.class).block();
+
+            JsonNode root = objectMapper.readTree(response);
+            return root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText().trim();
+        } catch (Exception e) {
+            System.err.println("❌ Lỗi nhận diện giọng nói AI: " + e.getMessage());
+            return null;
+        }
+    }
+    
 }

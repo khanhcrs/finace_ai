@@ -3,9 +3,10 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, SafeArea
 import { useTransaction } from '../../src/context/TransactionContext';
 import { useSettings } from '../../src/context/SettingsContext';
 import { Colors } from '../../src/theme/Colors';
-import { Send, Image as ImageIcon, Loader2, MessageSquare } from 'lucide-react-native';
+import { Send, Image as ImageIcon, Loader2, MessageSquare, Mic } from 'lucide-react-native';
 import axios from 'axios';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../../src/api/config';
 
@@ -29,7 +30,63 @@ export default function ChatScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [pendingTx, setPendingTx] = useState<any>(null);
 
+  // --- STT (GIỌNG NÓI) STATES ---
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+
   const flatListRef = useRef<FlatList>(null);
+
+  // --- HÀM GHI ÂM (MỚI) ---
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Cấp quyền', 'App cần quyền Micro để bạn có thể nói thay vì gõ chữ nha!');
+        return;
+      }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      setRecording(recording);
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Lỗi khi bắt đầu ghi âm:', err);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+    setIsRecording(false);
+    await recording.stopAndUnloadAsync();
+    const uri = recording.getURI();
+    setRecording(null);
+    if (uri) handleAudioUpload(uri);
+  };
+
+  const handleAudioUpload = async (uri: string) => {
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      // @ts-ignore
+      formData.append('file', { uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri, type: 'audio/m4a', name: 'audio.m4a' });
+
+      const response = await axios.post(`${API_BASE_URL}/ai/speech-to-text`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data && response.data.text) {
+        // Điền chữ vào ô input thay vì gửi đi luôn, để người dùng kiểm tra lại
+        setInput(response.data.text);
+      } else {
+        Alert.alert('Lỗi', 'AI không nghe rõ bạn nói gì, bạn nói lại nhé.');
+      }
+    } catch (error) {
+      console.log(error);
+      Alert.alert('Lỗi', 'Có lỗi xảy ra khi gửi file ghi âm.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+  // -----------------------------
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -43,20 +100,12 @@ export default function ChatScreen() {
 
     try {
       const savedUserId = await AsyncStorage.getItem('finance_user_id') || '1';
-
-      const response = await axios.get(`${API_BASE_URL}/ai/process`, {
-        params: {
-          text: textToProcess,
-          userId: savedUserId
-        }
-      });
-
+      const response = await axios.get(`${API_BASE_URL}/ai/process`, { params: { text: textToProcess, userId: savedUserId } });
       const { reply, transaction } = response.data;
 
       if (transaction) {
         if (transaction.isAnomaly) {
           const aiText = reply || "Khoản chi này có vẻ bất thường. Bạn có muốn lưu không?";
-          
           const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: aiText };
           setMessages(prev => [...prev, aiMsg]);
           setPendingTx(transaction);
@@ -78,33 +127,19 @@ export default function ChatScreen() {
     }
   };
 
-  // HÀM SOÁT LỖI GÓI HÀNG Ở ĐÂY
   const handleConfirmSave = async () => {
     if (!pendingTx) return;
     try {
       const savedUserId = await AsyncStorage.getItem('finance_user_id') || '1';
-      
       const dataToSend = { ...pendingTx, isAnomaly: false, userId: savedUserId };
-      
-      console.log("==== GÓI HÀNG CHUẨN BỊ GỬI LÊN BACKEND ====");
-      console.log(JSON.stringify(dataToSend, null, 2));
-      console.log("============================================");
-
       await axios.post(`${API_BASE_URL}/transactions`, dataToSend);
       
       const aiMsg: Message = { id: Date.now().toString(), sender: 'ai', text: "✅ Đã lưu khoản chi đặc biệt này vào sổ!" };
       setMessages(prev => [...prev, aiMsg]);
-      
       setPendingTx(null);
       fetchData();
     } catch (error) {
-      console.log("==== LÝ DO BACKEND TỪ CHỐI ====");
-      if (axios.isAxiosError(error)) {
-        console.log(error.response?.data);
-      } else {
-        console.log(error);
-      }
-      Alert.alert("Lỗi 400", "Bạn hãy xem log ở màn hình máy tính nhé!");
+      Alert.alert("Lỗi", "Bạn hãy xem log ở màn hình máy tính nhé!");
     }
   };
 
@@ -115,14 +150,8 @@ export default function ChatScreen() {
   };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
-    if (!result.canceled) {
-      handleImageUpload(result.assets[0].uri);
-    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.8 });
+    if (!result.canceled) handleImageUpload(result.assets[0].uri);
   };
 
   const handleImageUpload = async (uri: string) => {
@@ -172,7 +201,7 @@ export default function ChatScreen() {
           <View style={styles.typingContainer}>
             <View style={[styles.typingBubble, { backgroundColor: theme.card }]}>
               <ActivityIndicator size="small" color={theme.tint} />
-              <Text style={[styles.typingText, { color: theme.secondaryText }]}>{isUploading ? "AI đang phân tích..." : "AI đang nghĩ..."}</Text>
+              <Text style={[styles.typingText, { color: theme.secondaryText }]}>{isUploading ? (isRecording ? "Đang ghi âm..." : "AI đang nghe/nhìn...") : "AI đang nghĩ..."}</Text>
             </View>
           </View>
         )}
@@ -188,10 +217,25 @@ export default function ChatScreen() {
         )}
 
         <View style={[styles.inputArea, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
-          <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.card }]} onPress={pickImage} disabled={isTyping || isUploading || pendingTx !== null}><ImageIcon size={22} color={theme.secondaryText} /></TouchableOpacity>
+          {/* NÚT THÊM ẢNH */}
+          <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.card }]} onPress={pickImage} disabled={isTyping || isUploading || pendingTx !== null || isRecording}>
+            <ImageIcon size={22} color={theme.secondaryText} />
+          </TouchableOpacity>
+          
+          {/* NÚT GHI ÂM (MỚI) */}
+          <TouchableOpacity 
+            style={[styles.iconButton, { backgroundColor: isRecording ? '#EF4444' : theme.card, marginRight: 10 }]} 
+            onPress={isRecording ? stopRecording : startRecording} 
+            disabled={isTyping || isUploading || pendingTx !== null}
+          >
+            <Mic size={22} color={isRecording ? '#FFF' : theme.secondaryText} />
+          </TouchableOpacity>
+
           <View style={[styles.inputContainer, { backgroundColor: theme.card }]}>
-            <TextInput style={[styles.input, { color: theme.text }]} placeholder="Nhập nội dung..." placeholderTextColor={theme.secondaryText} value={input} onChangeText={setInput} multiline editable={pendingTx === null} />
-            <TouchableOpacity style={[styles.sendButton, { backgroundColor: theme.tint === '#000' ? '#000' : '#fff', opacity: (!input.trim() || pendingTx !== null) ? 0.5 : 1 }]} onPress={handleSend} disabled={!input.trim() || isTyping || isUploading || pendingTx !== null}><Send size={18} color={theme.tint === '#000' ? '#fff' : '#000'} /></TouchableOpacity>
+            <TextInput style={[styles.input, { color: theme.text }]} placeholder={isRecording ? "Đang ghi âm..." : "Nhập nội dung..."} placeholderTextColor={theme.secondaryText} value={input} onChangeText={setInput} multiline editable={pendingTx === null && !isRecording} />
+            <TouchableOpacity style={[styles.sendButton, { backgroundColor: theme.tint === '#000' ? '#000' : '#fff', opacity: (!input.trim() || pendingTx !== null || isRecording) ? 0.5 : 1 }]} onPress={handleSend} disabled={!input.trim() || isTyping || isUploading || pendingTx !== null || isRecording}>
+              <Send size={18} color={theme.tint === '#000' ? '#fff' : '#000'} />
+            </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -214,7 +258,7 @@ const styles = StyleSheet.create({
   typingBubble: { flexDirection: 'row', alignItems: 'center', padding: 8, paddingHorizontal: 12, borderRadius: 16, alignSelf: 'flex-start' },
   typingText: { fontSize: 12, marginLeft: 8 },
   inputArea: { flexDirection: 'row', alignItems: 'center', padding: 12, borderTopWidth: 1 },
-  iconButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  iconButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
   inputContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 22, paddingHorizontal: 4, minHeight: 44 },
   input: { flex: 1, paddingHorizontal: 12, fontSize: 15, maxHeight: 100 },
   sendButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', margin: 4 },
