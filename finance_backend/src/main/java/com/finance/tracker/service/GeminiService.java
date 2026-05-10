@@ -83,15 +83,18 @@ public class GeminiService {
         }
 
         String promptText = "Bạn là chuyên gia tài chính kiêm một người bạn thân thiết. Bạn PHẢI CHỈ TRẢ VỀ JSON ARRAY `[]`.\n\n" +
-                "👉 TRƯỜNG HỢP 1: Ghi chép chi tiêu/thu nhập/SỰ CỐ MẤT TIỀN (VD: 'ăn phở 50k', 'nhận lương', 'rớt 500k', 'bị lừa')\n" +
+                "👉 QUY TẮC NHẬN DIỆN THU/CHI (LÀM CẨN THẬN):\n" +
+                "1. THU NHẬP (type: 'INCOME'): Nhận diện các từ lóng: 'lụm', 'nhặt', 'nhận', 'thu', 'ting ting', 'lúa về', 'thóc về', 'húp được', 'bỏ túi', 'mẹ cho', 'ba cho', 'vợ phát', 'lì xì', 'thưởng', 'lương', 'trúng số'.\n" +
+                "2. CHI TIÊU (type: 'EXPENSE'): Nhận diện các từ lóng: 'cúng', 'đốt', 'hiến máu', 'bay màu', 'vỗ béo', 'bao bạn', 'nướng tiền', 'đi bụi', 'nạp thẻ', 'trả tiền', 'mất tiền'.\n" +
+                "3. MẶC ĐỊNH: Nếu không có từ khóa rõ ràng (VD: 'Cà phê 30k', 'Bún bò 40k'), hãy mặc định là 'EXPENSE'.\n\n" +
+                "👉 TRƯỜNG HỢP 1: Ghi chép thu chi/Sự cố (VD: 'ting ting 2tr', 'đốt 1 củ vào game', 'rớt 50k')\n" +
                 "Trả về JSON: [{\"amount\": số_tiền, \"date\": \"YYYY-MM-DD\", \"note\": \"nội dung\", \"type\": \"INCOME\" hoặc \"EXPENSE\", \"categoryName\": \"Danh mục\", \"isAnomaly\": true/false, \"anomalyReason\": \"lời trêu chọc\", \"botMessage\": \"lời nhắn gửi\"}]\n" +
-                "- Luật: '50k' tự hiểu là 50000. \n" +
-                "- NẾU MẤT TIỀN, RỚT TIỀN: Đây là khoản CHI TIÊU đã xảy ra (isAnomaly = false để lưu luôn). Hãy viết lời an ủi sâu sắc vào trường `botMessage`.\n" +
-                "- NẾU CHI TIÊU VÔ LÝ (ăn phở 500k): isAnomaly = true. Viết câu trêu chọc (và nhắc bấm nút Vẫn Lưu) vào trường `anomalyReason`.\n" +
-                "- BÌNH THƯỜNG: isAnomaly = false. Có thể khen ngợi ngắn gọn vào `botMessage`.\n\n" +
-                "👉 TRƯỜNG HỢP 2: Hỏi đáp, nhờ phân tích, tâm sự (KHÔNG CÓ SỐ TIỀN THU CHI)\n" +
-"👉 TRƯỜNG HỢP 2: Hỏi đáp, nhờ phân tích, báo cáo hoặc tâm sự...\n" +
-                "Trả về JSON Array ĐẶC BIỆT: [{\"amount\": 0, \"date\": \"" + today + "\", \"note\": \"<VIẾT CÂU TRẢ LỜI>. Tuyệt đối không dùng phần thập phân khi viết số tiền (VD: dùng 600.000đ, KHÔNG DÙNG 600,000.00đ).\", \"type\": \"CHAT\", \"categoryName\": \"CHAT\", \"isAnomaly\": false, \"botMessage\": \"\"}]\n\n" +                historyStr.toString() + "\n\n" +
+                "- Luật: '50k' = 50000, '1 củ' = 1000000, '5 xị' = 500000, '2 lít' = 200000. \n" +
+                "- LỜI NHẮN: Nếu người dùng 'đốt' tiền hoặc 'cúng' tiền, hãy trêu chọc hài hước trong `botMessage`. Nếu họ 'lụm' được tiền hoặc 'lúa về', hãy chúc mừng phấn khởi.\n" +
+                "- CHI TIÊU VÔ LÝ: Nếu số tiền quá lớn cho 1 món ăn/vặt (VD: ăn sáng 500k), set isAnomaly = true.\n\n" +
+                "👉 TRƯỜNG HỢP 2: Hỏi đáp, báo cáo hoặc tâm sự...\n" +
+                "Trả về JSON Array ĐẶC BIỆT: [{\"amount\": 0, \"date\": \"" + today + "\", \"note\": \"<VIẾT CÂU TRẢ LỜI>\", \"type\": \"CHAT\", \"categoryName\": \"CHAT\", \"isAnomaly\": false, \"botMessage\": \"\"}]\n\n" +
+                historyStr.toString() + "\n\n" +
                 "Hôm nay là: " + today + "\nCâu của người dùng: '" + userInput + "'";
 
         Map<String, Object> body = Map.of("contents", List.of(Map.of("parts", List.of(Map.of("text", promptText)))));
