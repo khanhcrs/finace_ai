@@ -75,7 +75,7 @@ public class UserController {
         if (userOpt.isPresent() && userOpt.get().getPasswordHash().equals(password)) {
             return ResponseEntity.ok(userOpt.get()); // Trả về thông tin User cho React lưu LocalStorage
         }
-
+        
         // Nếu sai thì báo lỗi 401 Unauthorized
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sai email hoặc mật khẩu!");
     }

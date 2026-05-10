@@ -60,7 +60,7 @@
                         return ResponseEntity.ok(Map.of("mustConfirm", false, "reply", transactions.get(0).getNote().split("\\|")[1]));
                     }
 
-                    // 🌟 BẮT LUỒNG TÂM SỰ / PHÂN TÍCH (Không lưu vào DB)
+                    //  BẮT LUỒNG TÂM SỰ / PHÂN TÍCH (Không lưu vào DB)
                     if (transactions.size() == 1 && "CHAT".equals(transactions.get(0).getType())) {
                         String noteContent = transactions.get(0).getNote();
                         String aiReply = noteContent.startsWith("CHAT|") ? noteContent.substring(5).trim() : noteContent;
