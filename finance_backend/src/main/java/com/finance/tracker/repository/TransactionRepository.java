@@ -11,7 +11,7 @@ import java.util.Map;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
-    
+
     List<Transaction> findByUserIdOrderByTransactionDateDescCreatedAtDesc(Long userId);
 
     List<Transaction> findByUserIdAndTransactionDate(Long userId, LocalDate date);
@@ -20,9 +20,12 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     @Query("SELECT SUM(t.amount) FROM Transaction t JOIN t.category c WHERE t.user.id = :userId AND c.type = :type")
     Double sumAmountByUserIdAndType(@Param("userId") Long userId, @Param("type") String type);
 
+    @Query("SELECT SUM(t.amount) FROM Transaction t WHERE t.user.id = :userId AND t.category.id = :categoryId AND t.type = 'EXPENSE'")
+    Double sumExpenseByUserIdAndCategoryId(@Param("userId") Long userId, @Param("categoryId") Long categoryId);
+
     // Thống kê số tiền chi tiêu theo từng danh mục (Để vẽ biểu đồ tròn)
     @Query("SELECT t.category.name as category, SUM(t.amount) as total FROM Transaction t " +
-           "WHERE t.user.id = :userId AND t.category.type = 'EXPENSE' " +
-           "GROUP BY t.category.name")
+            "WHERE t.user.id = :userId AND t.category.type = 'EXPENSE' " +
+            "GROUP BY t.category.name")
     List<Map<String, Object>> sumAmountByCategory(@Param("userId") Long userId);
 }

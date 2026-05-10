@@ -35,15 +35,17 @@ public class TransactionService {
             transaction.setUser(user);
         }
 
-        // Tự động phát hiện chi tiêu bất thường dựa trên DANH MỤC và THIẾT LẬP NGƯỜI DÙNG
+        // Tự động phát hiện chi tiêu bất thường dựa trên DANH MỤC và THIẾT LẬP NGƯỜI
+        // DÙNG
         if (transaction.getAmount() != null && "EXPENSE".equalsIgnoreCase(transaction.getType()) && user != null) {
             double amt = transaction.getAmount().doubleValue();
             String catName = "";
             Double catLimit = null;
-            
+
             // Lấy thông tin danh mục từ DB để có dữ liệu mới nhất (bao gồm cả limitAmount)
             if (transaction.getCategory() != null && transaction.getCategory().getId() != null) {
-                com.finance.tracker.model.Category dbCategory = categoryRepository.findById(transaction.getCategory().getId()).orElse(null);
+                com.finance.tracker.model.Category dbCategory = categoryRepository
+                        .findById(transaction.getCategory().getId()).orElse(null);
                 if (dbCategory != null) {
                     catName = dbCategory.getName();
                     catLimit = dbCategory.getLimitAmount();
@@ -52,13 +54,19 @@ public class TransactionService {
 
             boolean isAnomaly = false;
             String reason = "";
-            
-            // Chỉ kiểm tra hạn mức RIÊNG của danh mục
-            if (catLimit != null && amt >= catLimit) {
-                isAnomaly = true;
-                reason = "Vượt hạn mức danh mục " + catName + " (" + String.format("%,.0f", catLimit) + "đ)";
+
+            // Kiểm tra tổng chi tiêu theo danh mục để phát hiện vượt hạn mức
+            if (catLimit != null && transaction.getCategory() != null && transaction.getCategory().getId() != null) {
+                Double currentSpent = transactionRepository.sumExpenseByUserIdAndCategoryId(user.getId(),
+                        transaction.getCategory().getId());
+                double totalSpent = (currentSpent != null ? currentSpent : 0.0) + amt;
+
+                if (totalSpent > catLimit) {
+                    isAnomaly = true;
+                    reason = "Danh mục " + catName + " đã vượt hạn mức " + String.format("%,.0f", catLimit) + "đ";
+                }
             }
-            
+
             transaction.setIsAnomaly(isAnomaly);
 
             // Gửi thông báo ngay lập tức nếu là bất thường (vượt hạn mức danh mục)
@@ -71,6 +79,7 @@ public class TransactionService {
 
         return transactionRepository.save(transaction);
     }
+
     public void deleteTransaction(Long id) {
         transactionRepository.deleteById(id);
     }
@@ -85,18 +94,18 @@ public class TransactionService {
             return transactionRepository.save(transaction);
         }).orElse(null);
     }
+
     public Map<String, Double> getBalanceSummary(Long userId) {
         Double income = transactionRepository.sumAmountByUserIdAndType(userId, "INCOME");
         Double expense = transactionRepository.sumAmountByUserIdAndType(userId, "EXPENSE");
-        
+
         income = (income != null) ? income : 0.0;
         expense = (expense != null) ? expense : 0.0;
 
         return Map.of(
-            "totalIncome", income,
-            "totalExpense", expense,
-            "balance", income - expense
-        );
+                "totalIncome", income,
+                "totalExpense", expense,
+                "balance", income - expense);
     }
 
     public List<Map<String, Object>> getStatistics(Long userId) {
