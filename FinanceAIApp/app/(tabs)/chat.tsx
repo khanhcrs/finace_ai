@@ -101,7 +101,7 @@ export default function ChatScreen() {
     try {
       const savedUserId = await AsyncStorage.getItem('finance_user_id') || '1';
       const response = await axios.get(`${API_BASE_URL}/ai/process`, { params: { text: textToProcess, userId: savedUserId } });
-      const { reply, transaction } = response.data;
+      const { reply, transaction, saved } = response.data;
 
       if (transaction) {
         if (transaction.isAnomaly) {
@@ -115,6 +115,10 @@ export default function ChatScreen() {
           setMessages(prev => [...prev, aiMsg]);
           fetchData(); 
         }
+      } else if (saved) {
+        const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: reply || "Đã ghi chép giao dịch thành công!" };
+        setMessages(prev => [...prev, aiMsg]);
+        fetchData(); 
       } else {
         const aiMsg: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: reply || "Đã xử lý xong!" };
         setMessages(prev => [...prev, aiMsg]);

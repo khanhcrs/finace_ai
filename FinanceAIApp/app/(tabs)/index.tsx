@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Image } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useTransaction } from '../../src/context/TransactionContext';
 import { useSettings } from '../../src/context/SettingsContext';
+import { useAuth } from '../../src/context/AuthContext';
 import { Colors } from '../../src/theme/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -15,18 +16,11 @@ import TransactionItem from '../../src/components/TransactionItem';
 export default function HomeScreen() {
   const { transactions, isLoading } = useTransaction();
   const { darkMode } = useSettings();
+  const { user } = useAuth();
   const theme = darkMode ? Colors.dark : Colors.light;
   const router = useRouter();
 
-  const [userName, setUserName] = useState('Khách');
-
-  useEffect(() => {
-    const loadUserName = async () => {
-      const name = await AsyncStorage.getItem('finance_user_name');
-      if (name) setUserName(name);
-    };
-    loadUserName();
-  }, []);
+  const userName = user?.fullName || 'Khách';
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -48,8 +42,12 @@ export default function HomeScreen() {
             <Text style={[styles.greeting, { color: theme.secondaryText }]}>{getGreeting()}</Text>
             <Text style={[styles.userName, { color: theme.text }]}>{userName}</Text>
           </View>
-          <View style={[styles.avatar, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Text style={[styles.avatarText, { color: theme.text }]}>{userName.charAt(0).toUpperCase()}</Text>
+          <View style={[styles.avatar, { backgroundColor: theme.card, borderColor: theme.border, overflow: 'hidden' }]}>
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} style={{ width: '100%', height: '100%' }} />
+            ) : (
+              <Text style={[styles.avatarText, { color: theme.text }]}>{userName.charAt(0).toUpperCase()}</Text>
+            )}
           </View>
         </View>
 

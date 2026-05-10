@@ -203,16 +203,33 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     const updateTransaction = async (id: number, updatedTx: any) => {
         const userId = await getUserId();
         try {
+            let currentCategoryId = updatedTx.categoryId;
+            const expectedType = updatedTx.isIncome ? 'INCOME' : 'EXPENSE';
+
+            // KIỂM TRA MÂU THUẪN: Tìm danh mục hiện tại xem nó là Thu hay Chi
+            const categoryToUse = categories.find(c => c.id === currentCategoryId);
+            
+            // Nếu danh mục cũ không cùng loại với loại mới (Ví dụ đổi từ Chi sang Thu)
+            if (!categoryToUse || categoryToUse.type !== expectedType) {
+                // Tự động tìm một danh mục bất kỳ thuộc loại mới (Thu/Chi) để thay thế
+                const fallbackList = categories.filter(c => c.type === expectedType);
+                if (fallbackList.length > 0) {
+                    currentCategoryId = fallbackList[0].id; // Lấy tạm danh mục đầu tiên làm mặc định
+                }
+            }
+
             const dataToSend = {
                 amount: updatedTx.amount,
                 note: updatedTx.title,
-                type: updatedTx.isIncome ? 'INCOME' : 'EXPENSE',
+                type: expectedType,
                 transactionDate: updatedTx.date || new Date().toISOString().split('T')[0],
-                category: { id: updatedTx.categoryId },
+                category: { id: currentCategoryId }, // Gửi danh mục đã được xử lý mâu thuẫn
                 user: { id: userId }
             };
 
-            await axios.put(`${API_TX_URL}/${id}`, dataToSend);
+            const response = await axios.put(`${API_TX_URL}/${id}`, dataToSend);
+            
+            // Cập nhật lại danh sách trên màn hình
             await fetchData(true);
             return true;
         } catch (error) {
@@ -220,7 +237,6 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
             return false;
         }
     };
-
     const deleteTransaction = async (id: number) => {
         try {
             await axios.delete(`${API_TX_URL}/${id}`);

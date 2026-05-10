@@ -81,6 +81,7 @@ public class TransactionService {
             transaction.setNote(newTransaction.getNote());
             transaction.setTransactionDate(newTransaction.getTransactionDate());
             transaction.setCategory(newTransaction.getCategory());
+            transaction.setType(newTransaction.getType());
             return transactionRepository.save(transaction);
         }).orElse(null);
     }

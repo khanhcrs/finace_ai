@@ -23,4 +23,14 @@ public class CategoryController {
     public Category create(@RequestBody Category category) {
         return categoryService.saveCategory(category);
     }
+
+    @DeleteMapping("/{id}")
+    public org.springframework.http.ResponseEntity<?> delete(@PathVariable Long id) {
+        try {
+            categoryService.deleteCategory(id);
+            return org.springframework.http.ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error", "Không thể xóa danh mục này (có thể do đang có giao dịch sử dụng danh mục)."));
+        }
+    }
 }

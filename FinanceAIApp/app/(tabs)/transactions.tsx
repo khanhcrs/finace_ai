@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, TextInput, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Alert, Modal, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTransaction, Transaction } from '../../src/context/TransactionContext';
 import { useSettings } from '../../src/context/SettingsContext';
 import { Colors } from '../../src/theme/Colors';
@@ -21,6 +22,7 @@ export default function TransactionsScreen() {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [editAmount, setEditAmount] = useState('');
   const [editTitle, setEditTitle] = useState('');
+  const [editIsIncome, setEditIsIncome] = useState(false);
 
   const filteredTransactions = transactions.filter(tx => {
     const matchesSearch = tx.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -43,6 +45,7 @@ export default function TransactionsScreen() {
             setSelectedTx(transaction);
             setEditAmount(transaction.amount.toString());
             setEditTitle(transaction.title);
+            setEditIsIncome(transaction.isIncome);
             setIsEditModalOpen(true);
           }
         },
@@ -81,8 +84,8 @@ export default function TransactionsScreen() {
     const success = await updateTransaction(selectedTx.id, {
       amount: parseInt(editAmount),
       title: editTitle,
-      isIncome: selectedTx.isIncome,
-      categoryId: selectedTx.categoryId,
+      isIncome: editIsIncome,
+      categoryId: selectedTx.categoryId, // Giữ nguyên danh mục cũ
       date: selectedTx.date
     });
 
@@ -94,7 +97,7 @@ export default function TransactionsScreen() {
     }
   };
 
-  const renderItem = ({ item }: { item: any }) => (
+  const renderItem = ({ item }: { item: Transaction }) => (
     <TransactionItem 
       transaction={item} 
       onPress={() => {}} 
@@ -150,7 +153,6 @@ export default function TransactionsScreen() {
         }
       />
 
-      {/* Edit Modal */}
       <Modal visible={isEditModalOpen} animationType="slide" transparent>
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -164,7 +166,8 @@ export default function TransactionsScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalBody}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalBody}>
+              
               <Text style={[styles.label, { color: theme.secondaryText }]}>DIỄN GIẢI</Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
@@ -180,13 +183,40 @@ export default function TransactionsScreen() {
                 keyboardType="numeric"
               />
 
+              <Text style={[styles.label, { color: theme.secondaryText, marginTop: 4 }]}>LOẠI GIAO DỊCH</Text>
+              <View style={styles.typeContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.typeButton,
+                    { borderColor: theme.border },
+                    editIsIncome && styles.typeActiveIncome
+                  ]}
+                  onPress={() => setEditIsIncome(true)}
+                >
+                  <Text style={{ color: editIsIncome ? '#fff' : theme.text, fontWeight: 'bold' }}>Thu nhập</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.typeButton,
+                    { borderColor: theme.border },
+                    !editIsIncome && styles.typeActiveExpense
+                  ]}
+                  onPress={() => setEditIsIncome(false)}
+                >
+                  <Text style={{ color: !editIsIncome ? '#fff' : theme.text, fontWeight: 'bold' }}>Chi tiêu</Text>
+                </TouchableOpacity>
+              </View>
+
               <TouchableOpacity 
-                style={[styles.saveButton, { backgroundColor: theme.tint }]}
+                style={[styles.saveButton, { backgroundColor: theme.tint, marginTop: 16 }]}
                 onPress={handleUpdate}
               >
                 <Text style={[styles.saveButtonText, { color: theme.background }]}>Lưu thay đổi</Text>
               </TouchableOpacity>
-            </View>
+              
+              <View style={{ height: 20 }} />
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -254,24 +284,25 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     minHeight: 400,
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
   },
   modalBody: {
-    gap: 16,
+    gap: 12,
   },
   label: {
     fontSize: 12,
     fontWeight: 'bold',
-    marginBottom: -8,
+    marginBottom: -4,
   },
   input: {
     height: 54,
@@ -280,12 +311,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
   },
+  typeContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  typeButton: {
+    flex: 1,
+    height: 54,
+    borderWidth: 1,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typeActiveIncome: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  typeActiveExpense: {
+    backgroundColor: '#F44336',
+    borderColor: '#F44336',
+  },
   saveButton: {
     height: 54,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
   },
   saveButtonText: {
     color: '#fff',
