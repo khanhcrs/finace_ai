@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Switch, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, Switch, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, TextInput, Alert, ActivityIndicator, Image, Modal } from 'react-native';
 import { useSettings } from '../../src/context/SettingsContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTransaction } from '../../src/context/TransactionContext';
@@ -7,14 +7,96 @@ import { Colors } from '../../src/theme/Colors';
 import * as LucideIcons from 'lucide-react-native';
 import axios from 'axios';
 import { API_BASE_URL } from '../../src/api/config';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function SettingsScreen() {
   const { darkMode, setDarkMode, chartType, setChartType, reportRange, setReportRange } = useSettings();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const { categories, fetchData } = useTransaction();
   const theme = darkMode ? Colors.dark : Colors.light;
 
   const [isLoading, setIsLoading] = useState(false);
+
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [profileAvatar, setProfileAvatar] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      setProfileName(user.fullName || '');
+      setProfileAvatar(user.avatar || '');
+    }
+  }, [user]);
+
+  const handlePickAvatar = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      setProfileAvatar(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    try {
+      const payload: any = {};
+      if (profileName.trim() !== user.fullName) payload.fullName = profileName.trim();
+      
+      if (oldPassword || newPassword || confirmPassword) {
+        if (!oldPassword) {
+          Alert.alert("Lỗi", "Vui lòng nhập mật khẩu cũ.");
+          return;
+        }
+        if (!newPassword) {
+          Alert.alert("Lỗi", "Vui lòng nhập mật khẩu mới.");
+          return;
+        }
+        if (newPassword !== confirmPassword) {
+          Alert.alert("Lỗi", "Mật khẩu mới và Nhập lại mật khẩu không khớp.");
+          return;
+        }
+        payload.oldPassword = oldPassword;
+        payload.password = newPassword;
+      }
+      
+      if (profileAvatar !== user.avatar) payload.avatar = profileAvatar;
+
+      if (Object.keys(payload).length > 0) {
+        setIsLoading(true);
+        await axios.put(`${API_BASE_URL}/users/${user.id}/profile`, payload);
+
+        const updateData: any = {};
+        if (payload.fullName) updateData.fullName = payload.fullName;
+        if (payload.avatar) updateData.avatar = payload.avatar;
+        if (Object.keys(updateData).length > 0) {
+          await updateUser(updateData);
+        }
+        Alert.alert("Thành công", "Cập nhật hồ sơ thành công!");
+        setIsEditingProfile(false);
+        setOldPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        setIsEditingProfile(false);
+      }
+    } catch (e: any) {
+      if (e.response && e.response.data && e.response.data.error) {
+        Alert.alert("Lỗi", e.response.data.error);
+      } else {
+        Alert.alert("Lỗi", "Không thể cập nhật hồ sơ");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Category management state
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -28,8 +110,8 @@ export default function SettingsScreen() {
   const [editIcon, setEditIcon] = useState('HelpCircle');
 
   const AVAILABLE_ICONS = [
-    'Coffee', 'Utensils', 'Car', 'Bus', 'ShoppingBag', 'DollarSign', 
-    'Home', 'Tv', 'Film', 'Zap', 'Heart', 'Briefcase', 'BookOpen', 
+    'Coffee', 'Utensils', 'Car', 'Bus', 'ShoppingBag', 'DollarSign',
+    'Home', 'Tv', 'Film', 'Zap', 'Heart', 'Briefcase', 'BookOpen',
     'GraduationCap', 'HelpCircle', 'Plane', 'Gift', 'Stethoscope', 'PawPrint'
   ];
 
@@ -74,6 +156,34 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleDeleteCategory = (id: number) => {
+    Alert.alert(
+      "Xác nhận",
+      "Bạn có chắc muốn xóa danh mục này?",
+      [
+        { text: "Hủy", style: "cancel" },
+        { 
+          text: "Xóa", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await axios.delete(`${API_BASE_URL}/categories/${id}`);
+              setEditingCatId(null);
+              await fetchData();
+              Alert.alert("Thành công", "Đã xóa danh mục");
+            } catch (e: any) {
+              if (e.response && e.response.data && e.response.data.error) {
+                Alert.alert("Lỗi", e.response.data.error);
+              } else {
+                Alert.alert("Lỗi", "Không thể xóa danh mục này");
+              }
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const startEditing = (cat: any) => {
     setEditingCatId(cat.id);
     setEditName(cat.name);
@@ -90,15 +200,22 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.secondaryText }]}>TÀI KHOẢN</Text>
-          <View style={[styles.settingItem, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={styles.settingLabelContainer}>
-              <LucideIcons.User size={20} color={theme.text} style={styles.icon} />
-              <View>
-                <Text style={[styles.settingLabel, { color: theme.text }]}>{user?.fullName || 'Người dùng'}</Text>
-                <Text style={[styles.settingSubLabel, { color: theme.secondaryText }]}>{user?.email}</Text>
+          <TouchableOpacity onPress={() => setIsEditingProfile(true)}>
+            <View style={[styles.settingItem, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View style={styles.settingLabelContainer}>
+                {user?.avatar ? (
+                  <Image source={{ uri: user.avatar }} style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }} />
+                ) : (
+                  <LucideIcons.User size={40} color={theme.text} style={styles.icon} />
+                )}
+                <View>
+                  <Text style={[styles.settingLabel, { color: theme.text }]}>{user?.fullName || 'Người dùng'}</Text>
+                  <Text style={[styles.settingSubLabel, { color: theme.secondaryText }]}>{user?.email}</Text>
+                </View>
               </View>
+              <LucideIcons.ChevronRight size={20} color={theme.secondaryText} />
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -119,13 +236,13 @@ export default function SettingsScreen() {
                 onChangeText={setNewCatName}
               />
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setNewCatType('EXPENSE')}
                   style={[styles.typeButton, newCatType === 'EXPENSE' && { backgroundColor: theme.tint }]}
                 >
                   <Text style={{ color: newCatType === 'EXPENSE' ? theme.background : theme.text, fontSize: 12, fontWeight: 'bold' }}>CHI TIÊU</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setNewCatType('INCOME')}
                   style={[styles.typeButton, newCatType === 'INCOME' && { backgroundColor: theme.tint }]}
                 >
@@ -137,8 +254,8 @@ export default function SettingsScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {AVAILABLE_ICONS.map(icon => (
-                    <TouchableOpacity 
-                      key={icon} 
+                    <TouchableOpacity
+                      key={icon}
                       onPress={() => setNewCatIcon(icon)}
                       style={[
                         { padding: 8, borderRadius: 8, borderWidth: 1, borderColor: theme.border },
@@ -159,11 +276,11 @@ export default function SettingsScreen() {
                 value={newCatLimit}
                 onChangeText={setNewCatLimit}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.saveButton, { backgroundColor: theme.tint }]}
                 onPress={handleAddCategory}
               >
-                <LucideIcons.Check size={18} color={theme.background} style={{marginRight: 8}} />
+                <LucideIcons.Check size={18} color={theme.background} style={{ marginRight: 8 }} />
                 <Text style={[styles.saveButtonText, { color: theme.background }]}>Thêm danh mục</Text>
               </TouchableOpacity>
             </View>
@@ -182,8 +299,8 @@ export default function SettingsScreen() {
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       {AVAILABLE_ICONS.map(icon => (
-                        <TouchableOpacity 
-                          key={icon} 
+                        <TouchableOpacity
+                          key={icon}
                           onPress={() => setEditIcon(icon)}
                           style={[
                             { padding: 6, borderRadius: 6, borderWidth: 1, borderColor: theme.border },
@@ -202,17 +319,19 @@ export default function SettingsScreen() {
                     keyboardType="numeric"
                     onChangeText={setEditLimit}
                   />
-                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 14, alignItems: 'center' }}>
+                    <TouchableOpacity onPress={() => handleDeleteCategory(cat.id)}><LucideIcons.Trash2 size={20} color={theme.error} /></TouchableOpacity>
+                    <View style={{ width: 1, height: 20, backgroundColor: theme.border }} />
                     <TouchableOpacity onPress={() => handleUpdateCategory(cat)}><LucideIcons.Check size={20} color={theme.tint} /></TouchableOpacity>
-                    <TouchableOpacity onPress={() => setEditingCatId(null)}><LucideIcons.X size={20} color={theme.error} /></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setEditingCatId(null)}><LucideIcons.X size={20} color={theme.secondaryText} /></TouchableOpacity>
                   </View>
                 </View>
               ) : (
                 <>
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                       <Text style={{ fontSize: 10, color: theme.secondaryText }}>[{cat.icon}]</Text>
-                       <Text style={[styles.catName, { color: theme.text }]}>{cat.name}</Text>
+                      <Text style={{ fontSize: 10, color: theme.secondaryText }}>[{cat.icon}]</Text>
+                      <Text style={[styles.catName, { color: theme.text }]}>{cat.name}</Text>
                     </View>
                     <Text style={[styles.catLimit, { color: theme.secondaryText }]}>
                       {cat.limitAmount ? `Hạn mức: ${cat.limitAmount.toLocaleString()} đ` : 'Không giới hạn'}
@@ -260,13 +379,13 @@ export default function SettingsScreen() {
             <View style={styles.inputRow}>
               <Text style={[styles.inputLabel, { color: theme.text }]}>Loại biểu đồ mặc định</Text>
               <View style={{ flexDirection: 'row', backgroundColor: theme.background, borderRadius: 8, padding: 2 }}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setChartType('bar')}
                   style={[styles.smallTypeButton, chartType === 'bar' && { backgroundColor: theme.tint }]}
                 >
                   <Text style={{ fontSize: 10, fontWeight: 'bold', color: chartType === 'bar' ? theme.background : theme.text }}>CỘT</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setChartType('pie')}
                   style={[styles.smallTypeButton, chartType === 'pie' && { backgroundColor: theme.tint }]}
                 >
@@ -279,7 +398,7 @@ export default function SettingsScreen() {
               <Text style={[styles.inputLabel, { color: theme.text }]}>Kỳ báo cáo mặc định</Text>
               <View style={{ flexDirection: 'row', backgroundColor: theme.background, borderRadius: 8, padding: 2 }}>
                 {['week', 'month', 'year'].map(range => (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     key={range}
                     onPress={() => setReportRange(range)}
                     style={[styles.smallTypeButton, reportRange === range && { backgroundColor: theme.tint }]}
@@ -310,7 +429,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.logoutButton, { borderColor: theme.error }]}
           onPress={handleLogout}
         >
@@ -318,6 +437,86 @@ export default function SettingsScreen() {
           <Text style={[styles.logoutText, { color: theme.error }]}>Đăng xuất</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* PROFILE EDIT MODAL */}
+      <Modal animationType="slide" transparent={true} visible={isEditingProfile} onRequestClose={() => setIsEditingProfile(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Chỉnh sửa hồ sơ</Text>
+              <TouchableOpacity onPress={() => setIsEditingProfile(false)} style={styles.closeBtn}>
+                <LucideIcons.X size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <TouchableOpacity onPress={handlePickAvatar} style={{ position: 'relative' }}>
+                  {profileAvatar ? (
+                    <Image source={{ uri: profileAvatar }} style={{ width: 100, height: 100, borderRadius: 50, borderWidth: 2, borderColor: theme.tint }} />
+                  ) : (
+                    <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: theme.border, alignItems: 'center', justifyContent: 'center' }}>
+                      <LucideIcons.User size={50} color={theme.secondaryText} />
+                    </View>
+                  )}
+                  <View style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: theme.tint, borderRadius: 15, padding: 6 }}>
+                    <LucideIcons.Camera size={16} color={theme.background} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.inputLabel, { color: theme.text, marginBottom: 8 }]}>Tên hiển thị</Text>
+              <TextInput
+                style={[styles.inputField, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background, marginBottom: 16 }]}
+                value={profileName}
+                onChangeText={setProfileName}
+                placeholder="Nhập tên mới"
+                placeholderTextColor={theme.secondaryText}
+              />
+
+              <Text style={[styles.inputLabel, { color: theme.text, marginBottom: 8, marginTop: 8 }]}>Đổi mật khẩu (bỏ trống nếu không đổi)</Text>
+              <TextInput
+                style={[styles.inputField, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background, marginBottom: 12 }]}
+                value={oldPassword}
+                onChangeText={setOldPassword}
+                placeholder="Mật khẩu cũ"
+                placeholderTextColor={theme.secondaryText}
+                secureTextEntry
+              />
+              <TextInput
+                style={[styles.inputField, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background, marginBottom: 12 }]}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholder="Mật khẩu mới"
+                placeholderTextColor={theme.secondaryText}
+                secureTextEntry
+              />
+              <TextInput
+                style={[styles.inputField, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background, marginBottom: 24 }]}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="Nhập lại mật khẩu mới"
+                placeholderTextColor={theme.secondaryText}
+                secureTextEntry
+              />
+
+              <TouchableOpacity
+                style={[styles.saveButton, { backgroundColor: theme.tint, marginBottom: 40 }]}
+                onPress={handleSaveProfile}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={theme.background} />
+                ) : (
+                  <>
+                    <LucideIcons.Save size={20} color={theme.background} style={{ marginRight: 8 }} />
+                    <Text style={[styles.saveButtonText, { color: theme.background }]}>Lưu thay đổi</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -456,5 +655,26 @@ const styles = StyleSheet.create({
   logoutText: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  modalContent: {
+    height: '70%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  closeBtn: {
+    padding: 8,
+    backgroundColor: 'rgba(150,150,150,0.15)',
+    borderRadius: 20,
   }
 });
