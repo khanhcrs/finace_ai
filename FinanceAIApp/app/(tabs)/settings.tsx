@@ -100,6 +100,7 @@ export default function SettingsScreen() {
 
   // Category management state
   const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [isSeeAllCategories, setIsSeeAllCategories] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatLimit, setNewCatLimit] = useState('');
   const [newCatType, setNewCatType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
@@ -195,6 +196,78 @@ export default function SettingsScreen() {
     await logout();
   };
 
+  const renderCategoryItem = (cat: any) => {
+    const IconComponent = (LucideIcons as any)[cat.icon || 'HelpCircle'];
+    
+    return (
+      <View key={cat.id} style={[styles.catItem, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        {editingCatId === cat.id ? (
+          <View style={{ flex: 1, gap: 8 }}>
+            <TextInput
+              style={[styles.inputField, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+              value={editName}
+              onChangeText={setEditName}
+            />
+
+            <View style={styles.iconGrid}>
+              {AVAILABLE_ICONS.map(iconName => {
+                const GridIcon = (LucideIcons as any)[iconName];
+                return (
+                  <TouchableOpacity
+                    key={iconName}
+                    onPress={() => setEditIcon(iconName)}
+                    style={[
+                      styles.iconItem,
+                      { borderColor: theme.border },
+                      editIcon === iconName && { borderColor: theme.tint, backgroundColor: theme.tint + '20' }
+                    ]}
+                  >
+                    {GridIcon && <GridIcon size={20} color={editIcon === iconName ? theme.tint : theme.secondaryText} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TextInput
+              style={[styles.inputField, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+              value={editLimit}
+              keyboardType="numeric"
+              onChangeText={setEditLimit}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 14, alignItems: 'center' }}>
+              <TouchableOpacity onPress={() => handleDeleteCategory(cat.id)}><LucideIcons.Trash2 size={20} color={theme.error} /></TouchableOpacity>
+              <View style={{ width: 1, height: 20, backgroundColor: theme.border }} />
+              <TouchableOpacity onPress={() => handleUpdateCategory(cat)}><LucideIcons.Check size={20} color={theme.tint} /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setEditingCatId(null)}><LucideIcons.X size={20} color={theme.secondaryText} /></TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border }}>
+                {IconComponent && <IconComponent size={22} color={cat.type === 'INCOME' ? theme.success : theme.error} />}
+              </View>
+              <View>
+                <Text style={[styles.catName, { color: theme.text }]}>{cat.name}</Text>
+                <Text style={[styles.catLimit, { color: theme.secondaryText }]}>
+                  {cat.limitAmount ? `Hạn mức: ${cat.limitAmount.toLocaleString()} đ` : 'Không giới hạn'}
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Text style={{ fontSize: 10, fontWeight: 'bold', color: cat.type === 'INCOME' ? theme.success : theme.error }}>
+                {cat.type === 'INCOME' ? 'THU NHẬP' : 'CHI TIÊU'}
+              </Text>
+              <TouchableOpacity onPress={() => startEditing(cat)}>
+                <LucideIcons.Edit2 size={18} color={theme.secondaryText} />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -221,135 +294,125 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <Text style={[styles.sectionTitle, { color: theme.secondaryText, marginBottom: 0 }]}>DANH MỤC & HẠN MỨC HÀNG THÁNG</Text>
-            <TouchableOpacity onPress={() => setIsAddingCategory(!isAddingCategory)}>
-              {isAddingCategory ? <LucideIcons.X size={20} color={theme.error} /> : <LucideIcons.Plus size={20} color={theme.tint} />}
+            <TouchableOpacity onPress={() => setIsAddingCategory(true)}>
+              <LucideIcons.Plus size={20} color={theme.tint} />
             </TouchableOpacity>
           </View>
 
-          {isAddingCategory && (
-            <View style={[styles.thresholdCard, { backgroundColor: theme.card, borderColor: theme.border, marginBottom: 12 }]}>
-              <TextInput
-                style={[styles.inputField, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-                placeholder="Tên danh mục"
-                placeholderTextColor={theme.secondaryText}
-                value={newCatName}
-                onChangeText={setNewCatName}
-              />
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <TouchableOpacity
-                  onPress={() => setNewCatType('EXPENSE')}
-                  style={[styles.typeButton, newCatType === 'EXPENSE' && { backgroundColor: theme.tint }]}
-                >
-                  <Text style={{ color: newCatType === 'EXPENSE' ? theme.background : theme.text, fontSize: 12, fontWeight: 'bold' }}>CHI TIÊU</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setNewCatType('INCOME')}
-                  style={[styles.typeButton, newCatType === 'INCOME' && { backgroundColor: theme.tint }]}
-                >
-                  <Text style={{ color: newCatType === 'INCOME' ? theme.background : theme.text, fontSize: 12, fontWeight: 'bold' }}>THU NHẬP</Text>
-                </TouchableOpacity>
-              </View>
+          <Modal animationType="fade" transparent={true} visible={isAddingCategory} onRequestClose={() => setIsAddingCategory(false)}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+              <View style={[styles.modalContent, { backgroundColor: theme.card, borderRadius: 24, height: 'auto', maxHeight: '85%', width: '100%' }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: theme.text }]}>Thêm danh mục mới</Text>
+                  <TouchableOpacity onPress={() => setIsAddingCategory(false)} style={styles.closeBtn}>
+                    <LucideIcons.X size={24} color={theme.text} />
+                  </TouchableOpacity>
+                </View>
+                
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <Text style={[styles.inputLabel, { color: theme.text, marginBottom: 8 }]}>Tên danh mục</Text>
+                  <TextInput
+                    style={[styles.inputField, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background, marginBottom: 16 }]}
+                    placeholder="Ăn sáng, Lương tháng..."
+                    placeholderTextColor={theme.secondaryText}
+                    value={newCatName}
+                    onChangeText={setNewCatName}
+                  />
 
-              <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.secondaryText, marginTop: 4 }}>BIỂU TƯỢNG: {newCatIcon}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {AVAILABLE_ICONS.map(icon => (
+                  <Text style={[styles.inputLabel, { color: theme.text, marginBottom: 8 }]}>Loại danh mục</Text>
+                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
                     <TouchableOpacity
-                      key={icon}
-                      onPress={() => setNewCatIcon(icon)}
+                      onPress={() => setNewCatType('EXPENSE')}
                       style={[
-                        { padding: 8, borderRadius: 8, borderWidth: 1, borderColor: theme.border },
-                        newCatIcon === icon && { borderColor: theme.tint, backgroundColor: theme.tint + '20' }
+                        styles.typeButton, 
+                        { borderColor: theme.border, borderWidth: 1, backgroundColor: 'transparent' },
+                        newCatType === 'EXPENSE' && { backgroundColor: theme.error, borderColor: theme.error }
                       ]}
                     >
-                      <Text style={{ color: theme.text, fontSize: 12 }}>{icon}</Text>
+                      <Text style={{ color: newCatType === 'EXPENSE' ? '#fff' : theme.text, fontSize: 13, fontWeight: 'bold' }}>CHI TIÊU</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
+                    <TouchableOpacity
+                      onPress={() => setNewCatType('INCOME')}
+                      style={[
+                        styles.typeButton, 
+                        { borderColor: theme.border, borderWidth: 1, backgroundColor: 'transparent' },
+                        newCatType === 'INCOME' && { backgroundColor: theme.success, borderColor: theme.success }
+                      ]}
+                    >
+                      <Text style={{ color: newCatType === 'INCOME' ? '#fff' : theme.text, fontSize: 13, fontWeight: 'bold' }}>THU NHẬP</Text>
+                    </TouchableOpacity>
+                  </View>
 
-              <TextInput
-                style={[styles.inputField, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-                placeholder="Hạn mức (VNĐ)"
-                placeholderTextColor={theme.secondaryText}
-                keyboardType="numeric"
-                value={newCatLimit}
-                onChangeText={setNewCatLimit}
-              />
-              <TouchableOpacity
-                style={[styles.saveButton, { backgroundColor: theme.tint }]}
-                onPress={handleAddCategory}
-              >
-                <LucideIcons.Check size={18} color={theme.background} style={{ marginRight: 8 }} />
-                <Text style={[styles.saveButtonText, { color: theme.background }]}>Thêm danh mục</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {categories.map((cat) => (
-            <View key={cat.id} style={[styles.catItem, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              {editingCatId === cat.id ? (
-                <View style={{ flex: 1, gap: 8 }}>
-                  <TextInput
-                    style={[styles.inputField, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-                    value={editName}
-                    onChangeText={setEditName}
-                  />
-
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      {AVAILABLE_ICONS.map(icon => (
+                  <Text style={[styles.inputLabel, { color: theme.text, marginBottom: 8 }]}>Biểu tượng</Text>
+                  <View style={styles.iconGrid}>
+                    {AVAILABLE_ICONS.map(iconName => {
+                      const IconComponent = (LucideIcons as any)[iconName];
+                      return (
                         <TouchableOpacity
-                          key={icon}
-                          onPress={() => setEditIcon(icon)}
+                          key={iconName}
+                          onPress={() => setNewCatIcon(iconName)}
                           style={[
-                            { padding: 6, borderRadius: 6, borderWidth: 1, borderColor: theme.border },
-                            editIcon === icon && { borderColor: theme.tint, backgroundColor: theme.tint + '20' }
+                            styles.iconItem,
+                            { borderColor: theme.border },
+                            newCatIcon === iconName && { borderColor: theme.tint, backgroundColor: theme.tint + '20' }
                           ]}
                         >
-                          <Text style={{ color: theme.text, fontSize: 10 }}>{icon}</Text>
+                          {IconComponent && <IconComponent size={20} color={newCatIcon === iconName ? theme.tint : theme.secondaryText} />}
                         </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
+                      );
+                    })}
+                  </View>
 
+                  <Text style={[styles.inputLabel, { color: theme.text, marginBottom: 8 }]}>Hạn mức hàng tháng (VNĐ)</Text>
                   <TextInput
-                    style={[styles.inputField, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-                    value={editLimit}
+                    style={[styles.inputField, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background, marginBottom: 24 }]}
+                    placeholder="0 (Không giới hạn)"
+                    placeholderTextColor={theme.secondaryText}
                     keyboardType="numeric"
-                    onChangeText={setEditLimit}
+                    value={newCatLimit}
+                    onChangeText={setNewCatLimit}
                   />
-                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 14, alignItems: 'center' }}>
-                    <TouchableOpacity onPress={() => handleDeleteCategory(cat.id)}><LucideIcons.Trash2 size={20} color={theme.error} /></TouchableOpacity>
-                    <View style={{ width: 1, height: 20, backgroundColor: theme.border }} />
-                    <TouchableOpacity onPress={() => handleUpdateCategory(cat)}><LucideIcons.Check size={20} color={theme.tint} /></TouchableOpacity>
-                    <TouchableOpacity onPress={() => setEditingCatId(null)}><LucideIcons.X size={20} color={theme.secondaryText} /></TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ fontSize: 10, color: theme.secondaryText }}>[{cat.icon}]</Text>
-                      <Text style={[styles.catName, { color: theme.text }]}>{cat.name}</Text>
-                    </View>
-                    <Text style={[styles.catLimit, { color: theme.secondaryText }]}>
-                      {cat.limitAmount ? `Hạn mức: ${cat.limitAmount.toLocaleString()} đ` : 'Không giới hạn'}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: cat.type === 'INCOME' ? '#10b981' : '#ef4444' }}>
-                      {cat.type === 'INCOME' ? 'THU NHẬP' : 'CHI TIÊU'}
-                    </Text>
-                    <TouchableOpacity onPress={() => startEditing(cat)}>
-                      <LucideIcons.Edit2 size={16} color={theme.secondaryText} />
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
+
+                  <TouchableOpacity
+                    style={[styles.saveButton, { backgroundColor: theme.tint, marginBottom: 30 }]}
+                    onPress={handleAddCategory}
+                  >
+                    <LucideIcons.Check size={20} color={theme.background} style={{ marginRight: 8 }} />
+                    <Text style={[styles.saveButtonText, { color: theme.background }]}>Lưu danh mục</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </View>
             </View>
-          ))}
+          </Modal>
+
+          {categories.slice(0, 5).map((cat) => renderCategoryItem(cat))}
+
+          {categories.length > 5 && (
+            <TouchableOpacity 
+              style={[styles.seeAllBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={() => setIsSeeAllCategories(true)}
+            >
+              <Text style={{ color: theme.tint, fontWeight: '600' }}>Xem tất cả ({categories.length})</Text>
+            </TouchableOpacity>
+          )}
         </View>
+
+        <Modal animationType="fade" transparent={true} visible={isSeeAllCategories} onRequestClose={() => setIsSeeAllCategories(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <View style={[styles.modalContent, { backgroundColor: theme.card, borderRadius: 24, height: '80%', width: '100%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>Tất cả danh mục</Text>
+                <TouchableOpacity onPress={() => setIsSeeAllCategories(false)} style={styles.closeBtn}>
+                  <LucideIcons.X size={24} color={theme.text} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {categories.map((cat) => renderCategoryItem(cat))}
+                <View style={{ height: 40 }} />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.secondaryText }]}>GIAO DIỆN & THÔNG BÁO</Text>
@@ -440,8 +503,8 @@ export default function SettingsScreen() {
 
       {/* PROFILE EDIT MODAL */}
       <Modal animationType="slide" transparent={true} visible={isEditingProfile} onRequestClose={() => setIsEditingProfile(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card, borderRadius: 24, height: 'auto', maxHeight: '80%', width: '100%' }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>Chỉnh sửa hồ sơ</Text>
               <TouchableOpacity onPress={() => setIsEditingProfile(false)} style={styles.closeBtn}>
@@ -567,6 +630,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  iconGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+    justifyContent: 'flex-start',
+  },
+  iconItem: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   thresholdCard: {
     padding: 16,
     borderRadius: 16,
@@ -601,11 +679,10 @@ const styles = StyleSheet.create({
   },
   typeButton: {
     flex: 1,
-    height: 36,
-    borderRadius: 8,
+    height: 44,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#e5e7eb',
   },
   smallTypeButton: {
     paddingHorizontal: 12,
@@ -655,6 +732,13 @@ const styles = StyleSheet.create({
   logoutText: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  seeAllBtn: {
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+    borderWidth: 1,
   },
   modalContent: {
     height: '70%',
