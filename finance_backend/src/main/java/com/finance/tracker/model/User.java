@@ -37,4 +37,7 @@ public class User {
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "avatar", columnDefinition = "TEXT")
+    private String avatar;
 }

@@ -107,4 +107,31 @@ public class UserController {
         }
         return ResponseEntity.notFound().build();
     }
+
+    // 5. CẬP NHẬT THÔNG TIN CÁ NHÂN
+    @PutMapping("/{id}/profile")
+    public ResponseEntity<?> updateProfile(@PathVariable Long id, @RequestBody Map<String, String> profileData) {
+        Optional<User> userOpt = userService.getUserById(id);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            if (profileData.containsKey("fullName")) {
+                user.setFullName(profileData.get("fullName"));
+            }
+            if (profileData.containsKey("password")) {
+                if (profileData.containsKey("oldPassword")) {
+                    if (!user.getPasswordHash().equals(profileData.get("oldPassword"))) {
+                        return ResponseEntity.badRequest().body(Map.of("error", "Mật khẩu cũ không chính xác!"));
+                    }
+                } else {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Vui lòng nhập mật khẩu cũ!"));
+                }
+                user.setPasswordHash(profileData.get("password"));
+            }
+            if (profileData.containsKey("avatar")) {
+                user.setAvatar(profileData.get("avatar"));
+            }
+            return ResponseEntity.ok(userService.saveUser(user));
+        }
+        return ResponseEntity.notFound().build();
+    }
 }
