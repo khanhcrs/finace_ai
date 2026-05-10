@@ -16,6 +16,8 @@
     import java.util.Map;
     import java.util.List;
     import java.util.ArrayList;
+    import java.util.Locale;
+    import java.util.HashMap;
 
     @Service
     public class GeminiService {
@@ -56,6 +58,51 @@
                 return "[" + clean.substring(clean.indexOf("{"), clean.lastIndexOf("}") + 1) + "]";
             }
             return "[]";
+        }
+
+        private String normalizeCategoryName(String value) {
+            if (value == null) return "";
+            return value.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        }
+
+        private String findCategoryLimitExceededReason(List<Transaction> history, String categoryName, BigDecimal newAmount, String type, BigDecimal pendingBatchAmount) {
+            if (history == null || history.isEmpty() || categoryName == null || categoryName.isBlank()) return null;
+            if (!"EXPENSE".equalsIgnoreCase(type) || newAmount == null || newAmount.compareTo(BigDecimal.ZERO) <= 0) return null;
+
+            BigDecimal currentSpent = BigDecimal.ZERO;
+            Double categoryLimit = null;
+            String normalizedName = normalizeCategoryName(categoryName);
+
+            for (Transaction tx : history) {
+                if (tx.getCategory() == null || tx.getAmount() == null || tx.getType() == null) continue;
+                String txCategoryName = tx.getCategory().getName();
+                if (txCategoryName == null) continue;
+                String normalizedHistoryCategory = normalizeCategoryName(txCategoryName);
+                boolean isSameCategory = normalizedName.equals(normalizedHistoryCategory)
+                        || normalizedName.contains(normalizedHistoryCategory)
+                        || normalizedHistoryCategory.contains(normalizedName);
+                if (!isSameCategory) continue;
+                if (!"EXPENSE".equalsIgnoreCase(tx.getType())) continue;
+
+                currentSpent = currentSpent.add(tx.getAmount());
+                if (categoryLimit == null) {
+                    categoryLimit = tx.getCategory().getLimitAmount();
+                }
+            }
+
+            if (categoryLimit == null || categoryLimit <= 0) return null;
+
+            BigDecimal totalSpent = currentSpent
+                    .add(pendingBatchAmount != null ? pendingBatchAmount : BigDecimal.ZERO)
+                    .add(newAmount);
+            BigDecimal limit = BigDecimal.valueOf(categoryLimit);
+
+            if (totalSpent.compareTo(limit) > 0) {
+                String limitStr = String.format("%,.0f", categoryLimit).replace(",", ".");
+                String totalStr = String.format("%,.0f", totalSpent.doubleValue()).replace(",", ".");
+                return "Danh mục " + categoryName + " đã vượt hạn mức " + limitStr + "đ (tổng hiện tại: " + totalStr + "đ). Bạn có muốn tiếp tục lưu không?";
+            }
+            return null;
         }
 
         // ==========================================
@@ -116,6 +163,7 @@
                 String rawText = candidate.path("content").path("parts").get(0).path("text").asText();
                 JsonNode dataArray = objectMapper.readTree(extractJsonArray(rawText));
                 List<Transaction> transactions = new ArrayList<>();
+                Map<String, BigDecimal> batchCategoryExpense = new HashMap<>();
 
                 for (JsonNode data : dataArray) {
                     Transaction transaction = new Transaction();
@@ -151,7 +199,35 @@
                     }
                 
                     transaction.setNote(data.path("categoryName").asText("Khác") + "|" + data.path("note").asText("") + reason);
+
+                    String parsedCategoryName = data.path("categoryName").asText("Khác");
+                    String normalizedCategoryName = normalizeCategoryName(parsedCategoryName);
+                    BigDecimal pendingBatchAmount = batchCategoryExpense.getOrDefault(normalizedCategoryName, BigDecimal.ZERO);
+
+                    String limitExceededReason = findCategoryLimitExceededReason(
+                            history,
+                            parsedCategoryName,
+                            transaction.getAmount(),
+                            type,
+                            pendingBatchAmount
+                    );
+                    if (limitExceededReason != null && !limitExceededReason.isEmpty()) {
+                        transaction.setIsAnomaly(true);
+                        String noteWithReason = transaction.getNote();
+                        if (!noteWithReason.contains("_REASON_")) {
+                            noteWithReason = noteWithReason + " _REASON_" + limitExceededReason;
+                        }
+                        transaction.setNote(noteWithReason);
+                    }
+
                     transactions.add(transaction);
+
+                    if ("EXPENSE".equalsIgnoreCase(type)) {
+                        batchCategoryExpense.put(
+                                normalizedCategoryName,
+                                pendingBatchAmount.add(transaction.getAmount())
+                        );
+                    }
                 }
                 return transactions;
 

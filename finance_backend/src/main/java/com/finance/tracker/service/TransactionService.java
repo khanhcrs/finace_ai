@@ -53,12 +53,17 @@ public class TransactionService {
             boolean isAnomaly = false;
             String reason = "";
             
-            // Chỉ kiểm tra hạn mức RIÊNG của danh mục
-            if (catLimit != null && amt >= catLimit) {
-                isAnomaly = true;
-                reason = "Vượt hạn mức danh mục " + catName + " (" + String.format("%,.0f", catLimit) + "đ)";
+            // Kiểm tra tổng chi tiêu theo danh mục để phát hiện vượt hạn mức
+            if (catLimit != null && transaction.getCategory() != null && transaction.getCategory().getId() != null) {
+                Double currentSpent = transactionRepository.sumExpenseByUserIdAndCategoryId(user.getId(), transaction.getCategory().getId());
+                double totalSpent = (currentSpent != null ? currentSpent : 0.0) + amt;
+
+                if (totalSpent > catLimit) {
+                    isAnomaly = true;
+                    reason = "Danh mục " + catName + " đã vượt hạn mức " + String.format("%,.0f", catLimit) + "đ";
+                }
             }
-            
+
             transaction.setIsAnomaly(isAnomaly);
 
             // Gửi thông báo ngay lập tức nếu là bất thường (vượt hạn mức danh mục)
