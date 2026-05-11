@@ -5,17 +5,15 @@ import BalanceCard from '../components/BalanceCard';
 import SummaryCards from '../components/SummaryCards';
 import TransactionList from '../components/TransactionList';
 import AddTransactionModal from '../components/AddTransactionModal';
-import { useTransaction } from '../contexts/TransactionContext'; // <-- Import Hook
+import { useTransaction } from '../contexts/TransactionContext';
 import DashboardChart from '../components/DashboardChart';
 
 export default function HomeScreen() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     
-    // Lấy tên người dùng từ localStorage
     const userName = localStorage.getItem('finance_user_name') || 'Khách';
     const firstLetter = userName.charAt(0).toUpperCase();
 
-    // Hàm lấy lời chào theo thời gian thực
     const getGreeting = () => {
         const hour = new Date().getHours();
         if (hour >= 5 && hour < 11) return "Chào buổi sáng,";
@@ -24,7 +22,6 @@ export default function HomeScreen() {
         return "Chào buổi tối,";
     };
 
-    // MÓC DỮ LIỆU TỪ KHO RA (Thay vì tự khai báo như trước)
     const { transactions } = useTransaction();
 
     const totalIncome = transactions.filter(t => t.isIncome).reduce((sum, t) => sum + t.amount, 0);
@@ -45,7 +42,7 @@ export default function HomeScreen() {
                     </div>
                 </header>
 
-                {/* ... (Đoạn lưới div chứa các component giữ nguyên) ... */}
+                
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-6">
                         <BalanceCard balance={balance} />

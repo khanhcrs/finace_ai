@@ -1,4 +1,3 @@
-// File: src/layouts/MainLayout.jsx
 import { useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import ChatbotPanel from '../components/ChatbotPanel';
@@ -11,7 +10,6 @@ export default function MainLayout({ children }) {
     useEffect(() => {
         if (!userId) return;
 
-        // Polling thông báo mỗi 30 giây
         const checkNotifications = async () => {
             try {
                 const response = await axios.get(`http://localhost:8080/api/notifications/user/${userId}/unread`);
@@ -22,7 +20,6 @@ export default function MainLayout({ children }) {
                         duration: 5000,
                         position: 'top-right',
                     });
-                    // Đánh dấu đã đọc ngay sau khi hiện toast
                     await axios.put(`http://localhost:8080/api/notifications/${notif.id}/read`);
                 });
             } catch (error) {
@@ -30,14 +27,13 @@ export default function MainLayout({ children }) {
             }
         };
 
-        const interval = setInterval(checkNotifications, 30000); // 30 giây
-        checkNotifications(); // Kiểm tra ngay lần đầu
+        const interval = setInterval(checkNotifications, 30000);
+        checkNotifications();
 
         return () => clearInterval(interval);
     }, [userId]);
 
     return (
-        // Đã thêm: dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300
         <div className="flex h-screen bg-[#F9FAFB] dark:bg-gray-950 text-gray-900 dark:text-gray-100 overflow-hidden font-sans transition-colors duration-300">
 
             <Sidebar />

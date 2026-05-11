@@ -7,12 +7,10 @@ import TransactionsScreen from './screen/TransactionsScreen';
 import StatsScreen from './screen/StatsScreen';
 import LoginScreen from './screen/LoginScreen';
 import SettingsScreen from './screen/SettingsScreen';
-// import RegisterScreen from './screen/RegisterScreen';
 
 import { TransactionProvider } from './contexts/TransactionContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 
-// Auth Guard Component
 const ProtectedRoute = ({ children }) => {
   const userId = localStorage.getItem('finance_user_id');
   if (!userId) {
@@ -29,7 +27,7 @@ function App() {
         <Routes>
 
           <Route path="/login" element={<LoginScreen />} />
-          {/* <Route path="/register" element={<RegisterScreen />} /> */}
+          
 
           <Route path="/*" element={
             <ProtectedRoute>

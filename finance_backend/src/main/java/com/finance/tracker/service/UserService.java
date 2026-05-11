@@ -25,7 +25,6 @@ public class UserService {
         return userRepository.findById(id);
     }
 
-    // THÊM HÀM NÀY ĐỂ TÌM EMAIL KHI ĐĂNG NHẬP / ĐĂNG KÝ
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
     }

@@ -1,4 +1,3 @@
-// File: src/contexts/TransactionContext.jsx
 import { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { 
@@ -10,7 +9,6 @@ import {
 
 const TransactionContext = createContext();
 
-// TỪ ĐIỂN CHUYỂN ĐỔI CHỮ THÀNH ICON COMPONENT
 const ICON_MAP = {
     'Coffee': Coffee,
     'Utensils': Utensils,
@@ -41,7 +39,6 @@ export function TransactionProvider({ children }) {
     const [categories, setCategories] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Lấy userId trực tiếp trong hàm để luôn mới nhất
     const getUserId = () => {
         const savedUserId = localStorage.getItem('finance_user_id');
         return savedUserId ? parseInt(savedUserId) : 1;
@@ -73,11 +70,10 @@ export function TransactionProvider({ children }) {
                     icon: IconComponent,
                     categoryId: tx.category ? tx.category.id : null,
                     categoryName: tx.category ? tx.category.name : 'Khác',
-                    createdAt: tx.createdAt // Lưu thêm createdAt để sắp xếp chính xác hơn nếu có
+                    createdAt: tx.createdAt
                 };
             });
 
-            // SẮP XẾP: Mới nhất lên đầu (Theo ngày giảm dần, sau đó theo ID giảm dần)
             formattedTx.sort((a, b) => {
                 const dateA = new Date(a.date);
                 const dateB = new Date(b.date);
@@ -102,7 +98,6 @@ export function TransactionProvider({ children }) {
         try {
             let categoryId = newTx.categoryId;
 
-            // Nếu KHÔNG có categoryId truyền vào, mới thử logic đoán category
             if (!categoryId) {
                 if (newTx.icon && typeof newTx.icon !== 'string') {
                     const iconName = newTx.icon.displayName || newTx.icon.name;

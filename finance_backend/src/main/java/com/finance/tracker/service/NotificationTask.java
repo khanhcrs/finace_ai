@@ -22,14 +22,12 @@ public class NotificationTask {
     @Autowired
     private NotificationService notificationService;
 
-    // Gửi thông báo nhắc nhở lúc 20:00 tối mỗi ngày
     @Scheduled(cron = "0 0 20 * * *")
     public void remindDailyEntry() {
         List<User> users = userRepository.findAll();
         LocalDate today = LocalDate.now();
 
         for (User user : users) {
-            // Kiểm tra xem hôm nay User đã có giao dịch nào chưa
             long count = transactionRepository.findByUserIdAndTransactionDate(user.getId(), today).size();
             
             if (count == 0) {

@@ -6,7 +6,6 @@ import { useSettings } from '../../src/context/SettingsContext';
 import { Colors } from '../../src/theme/Colors';
 import { Search, X } from 'lucide-react-native';
 
-// Import Component
 import TransactionItem from '../../src/components/TransactionItem';
 
 export default function TransactionsScreen() {
@@ -17,7 +16,6 @@ export default function TransactionsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE'>('ALL');
   
-  // State for Edit Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [editAmount, setEditAmount] = useState('');
@@ -85,7 +83,7 @@ export default function TransactionsScreen() {
       amount: parseInt(editAmount),
       title: editTitle,
       isIncome: editIsIncome,
-      categoryId: selectedTx.categoryId, // Giữ nguyên danh mục cũ
+      categoryId: selectedTx.categoryId,
       date: selectedTx.date
     });
 

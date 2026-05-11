@@ -1,9 +1,6 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-// For Android emulator, use 10.0.2.2. For iOS simulator, use localhost.
-// Replace with your machine's local IP if testing on a physical device.
-// We try to get the host IP dynamically from Expo Constants
 const debuggerHost = Constants.expoConfig?.hostUri;
 const hostIP = debuggerHost?.split(':')[0];
 

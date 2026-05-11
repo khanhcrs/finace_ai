@@ -37,9 +37,6 @@ public class GeminiService {
                 .build();
     }
 
-    // ==========================================
-    // CÁC HÀM HỖ TRỢ XỬ LÝ JSON
-    // ==========================================
     private String extractJson(String rawText) {
         if (rawText == null)
             return "{}";
@@ -104,18 +101,11 @@ public class GeminiService {
         return null;
     }
 
-    // ==========================================
-    // 1. XỬ LÝ TEXT CHAT TỔNG HỢP (GHI CHÉP & HỎI ĐÁP)
-    // ==========================================
-    // ==========================================
-    // 1. XỬ LÝ TEXT CHAT TỔNG HỢP (GHI CHÉP & HỎI ĐÁP)
-    // ==========================================
     public List<Transaction> processChat(String userInput, List<Transaction> history) {
         String today = LocalDate.now().toString();
-        String currentMonth = today.substring(0, 7); // Lấy chuỗi "YYYY-MM" để lọc tháng hiện tại
+        String currentMonth = today.substring(0, 7);
         java.text.DecimalFormat df = new java.text.DecimalFormat("#,###");
 
-        // --- BƯỚC 1: TÍNH TOÁN HẠN MỨC VÀ SỐ TIỀN ĐÃ CHI TRONG THÁNG NÀY ---
         Map<String, Double> categoryLimits = new java.util.HashMap<>();
         Map<String, Double> categorySpent = new java.util.HashMap<>();
         StringBuilder historyStr = new StringBuilder();
@@ -127,11 +117,9 @@ public class GeminiService {
                 String cat = t.getCategory() != null ? t.getCategory().getName() : "Khác";
                 String formattedAmount = df.format(t.getAmount()).replace(",", ".");
 
-                // Nạp vào chuỗi lịch sử cho AI đọc
                 historyStr.append(String.format("- Ngày %s: %s %sđ (%s) - Ghi chú: %s\n",
                         t.getTransactionDate(), loai, formattedAmount, cat, t.getNote()));
 
-                // Tính tổng chi tiêu & Hạn mức (CHỈ LẤY GIAO DỊCH THÁNG NÀY)
                 if (t.getTransactionDate() != null && t.getTransactionDate().toString().startsWith(currentMonth)) {
                     if ("EXPENSE".equalsIgnoreCase(t.getType()) && t.getCategory() != null) {
                         double amount = t.getAmount() != null ? t.getAmount().doubleValue() : 0.0;
@@ -148,7 +136,6 @@ public class GeminiService {
             historyStr.append("Người dùng chưa có giao dịch nào.\n");
         }
 
-        // --- BƯỚC 2: TẠO BẢNG BÁO CÁO NGÂN SÁCH ĐỘNG CHO AI ---
         StringBuilder budgetStr = new StringBuilder();
         budgetStr.append("THÔNG TIN HẠN MỨC (BUDGET) TRONG THÁNG ").append(currentMonth).append(":\n");
         if (categoryLimits.isEmpty()) {
@@ -164,7 +151,6 @@ public class GeminiService {
             }
         }
 
-        // --- BƯỚC 3: BƠM TOÀN BỘ VÀO PROMPT CHO GEMINI ---
         String promptText = "Bạn là chuyên gia tài chính kiêm một người bạn thân thiết. Bạn PHẢI CHỈ TRẢ VỀ JSON ARRAY `[]`.\n\n"
                 + "👉 TRƯỜNG HỢP 1: Ghi chép chi tiêu/thu nhập/SỰ CỐ MẤT TIỀN (VD: 'ăn phở 50k', 'nhận lương', 'rớt 500k', 'bị lừa')\n"
                 + "Trả về JSON: [{\"amount\": số_tiền, \"date\": \"YYYY-MM-DD\", \"note\": \"nội dung\", \"type\": \"INCOME\" hoặc \"EXPENSE\", \"categoryName\": \"Danh mục\", \"isAnomaly\": true/false, \"anomalyReason\": \"lời trêu chọc/cảnh báo\", \"botMessage\": \"lời nhắn gửi\"}]\n"
@@ -243,8 +229,6 @@ public class GeminiService {
                 transaction.setNote(
                         data.path("categoryName").asText("Khác") + "|" + data.path("note").asText("") + reason);
 
-                // Đã bỏ hàm findCategoryLimitExceededReason ở đây vì Gemini đã tự giác phân
-                // tích toán học rồi
 
                 transactions.add(transaction);
             }
@@ -266,9 +250,6 @@ public class GeminiService {
         }
     }
 
-    // ==========================================
-    // 2. ĐỌC HÓA ĐƠN HÌNH ẢNH (Giữ nguyên)
-    // ==========================================
     public Transaction processReceiptImage(MultipartFile file) {
         try {
             byte[] bytes = file.getBytes();
@@ -321,12 +302,10 @@ public class GeminiService {
             String base64Audio = Base64.getEncoder().encodeToString(bytes);
             String mimeType = file.getContentType();
 
-            // Đảm bảo mimeType chuẩn cho audio
             if (mimeType == null || !mimeType.startsWith("audio/")) {
-                mimeType = "audio/mp4"; // Thường React Native lưu m4a dưới dạng mp4 container
+                mimeType = "audio/mp4";
             }
 
-            // Prompt đơn giản, ép AI làm người chép chính tả
             String promptText = "Bạn là một trợ lý nhận diện giọng nói. Hãy nghe đoạn âm thanh này và chuyển nó thành văn bản tiếng Việt một cách chính xác nhất. CHỈ TRẢ VỀ ĐOẠN VĂN BẢN ĐÓ, tuyệt đối không thêm lời chào, không giải thích, không dùng ngoặc kép.";
 
             Map<String, Object> inlineData = Map.of("mime_type", mimeType, "data", base64Audio);

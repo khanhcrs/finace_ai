@@ -30,13 +30,11 @@ export default function ChatScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [pendingTx, setPendingTx] = useState<any>(null);
 
-  // --- STT (GIỌNG NÓI) STATES ---
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
 
-  // --- HÀM GHI ÂM (MỚI) ---
   const startRecording = async () => {
     try {
       const permission = await Audio.requestPermissionsAsync();
@@ -66,7 +64,6 @@ export default function ChatScreen() {
     setIsUploading(true);
     try {
       const formData = new FormData();
-      // @ts-ignore
       formData.append('file', { uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri, type: 'audio/m4a', name: 'audio.m4a' });
 
       const response = await axios.post(`${API_BASE_URL}/ai/speech-to-text`, formData, {
@@ -74,7 +71,6 @@ export default function ChatScreen() {
       });
 
       if (response.data && response.data.text) {
-        // Điền chữ vào ô input thay vì gửi đi luôn, để người dùng kiểm tra lại
         setInput(response.data.text);
       } else {
         Alert.alert('Lỗi', 'AI không nghe rõ bạn nói gì, bạn nói lại nhé.');
@@ -86,7 +82,6 @@ export default function ChatScreen() {
       setIsUploading(false);
     }
   };
-  // -----------------------------
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -206,7 +201,6 @@ export default function ChatScreen() {
     try {
       const savedUserId = await AsyncStorage.getItem('finance_user_id') || '1';
       const formData = new FormData();
-      // @ts-ignore
       formData.append('file', { uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri, type: 'image/jpeg', name: 'receipt.jpg' });
       formData.append('userId', savedUserId);
 
@@ -261,12 +255,12 @@ export default function ChatScreen() {
         )}
 
         <View style={[styles.inputArea, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
-          {/* NÚT THÊM ẢNH */}
+          
           <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.card }]} onPress={pickImage} disabled={isTyping || isUploading || pendingTx !== null || isRecording}>
             <ImageIcon size={22} color={theme.secondaryText} />
           </TouchableOpacity>
           
-          {/* NÚT GHI ÂM (MỚI) */}
+          
           <TouchableOpacity 
             style={[styles.iconButton, { backgroundColor: isRecording ? '#EF4444' : theme.card, marginRight: 10 }]} 
             onPress={isRecording ? stopRecording : startRecording} 

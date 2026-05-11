@@ -1,6 +1,4 @@
-// File: src/screens/TransactionsScreen/TransactionsScreen.jsx
 import { useState } from 'react';
-// 1. ĐÃ THÊM DOLLAR SIGN VÀO ĐÂY ĐỂ LÀM ICON THẾ THÂN
 import { Search, Filter, Edit2, Trash2, DollarSign } from 'lucide-react';
 import { useTransaction } from '../contexts/TransactionContext';
 import { formatCurrency } from '../utils/format';
@@ -10,15 +8,12 @@ import EditTransactionModal from '../components/EditTransactionModal';
 export default function TransactionsScreen() {
     const { transactions, deleteTransaction } = useTransaction();
 
-    // State cho tìm kiếm và lọc
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterType, setFilterType] = useState('all'); // 'all', 'income', 'expense'
+    const [filterType, setFilterType] = useState('all');
 
-    // State cho Modal sửa
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedTx, setSelectedTx] = useState(null);
 
-    // LOGIC LỌC DỮ LIỆU
     const filteredTransactions = transactions.filter((tx) => {
         const matchesSearch = tx.title.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesFilter =
@@ -88,7 +83,6 @@ export default function TransactionsScreen() {
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                             {filteredTransactions.map((tx) => {
-                                // 2. BỌC THÉP TẠI ĐÂY: Nếu tx.icon bị rỗng, lập tức lấy DollarSign đắp vào!
                                 const Icon = tx.icon || DollarSign;
                                 
                                 return (
@@ -139,7 +133,7 @@ export default function TransactionsScreen() {
                 </div>
             </div>
 
-            {/* Modal chỉnh sửa */}
+            
             <EditTransactionModal 
                 isOpen={isEditModalOpen} 
                 onClose={() => setIsEditModalOpen(false)} 

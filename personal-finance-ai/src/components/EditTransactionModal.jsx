@@ -12,11 +12,9 @@ export default function EditTransactionModal({ isOpen, onClose, transaction }) {
     const [categoryId, setCategoryId] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Khi transaction thay đổi (mở modal lên), điền dữ liệu cũ vào form
     useEffect(() => {
         if (transaction) {
             setType(transaction.isIncome ? 'income' : 'expense');
-            // Format số tiền theo định dạng vi-VN
             setAmount(new Intl.NumberFormat('vi-VN').format(transaction.amount));
             setTitle(transaction.title);
             setCategoryId(transaction.categoryId || '');
@@ -38,7 +36,7 @@ export default function EditTransactionModal({ isOpen, onClose, transaction }) {
                 amount: parseInt(amount.replace(/\D/g, '')),
                 isIncome: type === 'income',
                 categoryId: categoryId,
-                date: transaction.date // Giữ nguyên ngày cũ
+                date: transaction.date
             };
 
             const success = await updateTransaction(transaction.id, updatedTx);

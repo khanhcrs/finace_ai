@@ -18,20 +18,17 @@ export default function AddTransactionScreen() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- SMART AUTO-SWITCH LOGIC ---
   useEffect(() => {
     if (!title) return;
 
     const note = title.toLowerCase();
 
-    // Từ khóa đặc trưng cho Chi tiêu
     const expenseKeywords = [
       'ăn', 'uống', 'mua', 'chi', 'trả', 'xăng', 'điện', 'nước',
       'học phí', 'vặt', 'cafe', 'phở', 'bún', 'cơm', 'trưa', 'tối', 'sáng',
       'siêu thị', 'shopee', 'lazada', 'tiki', 'grab', 'be', 'gojek', 'bị phạt', 'mua sách', 'mất tiền'
     ];
 
-    // Từ khóa đặc trưng cho Thu nhập
     const incomeKeywords = [
       'lương', 'thưởng', 'nhận', 'lãi', 'quà', 'được cho',
       'mẹ cho', 'ba cho', 'bán', 'hoàn tiền', 'đòi nợ', 'mừng tuổi', 'tiền mừng', 'trộm tiền'

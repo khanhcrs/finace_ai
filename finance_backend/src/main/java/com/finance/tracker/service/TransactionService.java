@@ -35,14 +35,11 @@ public class TransactionService {
             transaction.setUser(user);
         }
 
-        // Tự động phát hiện chi tiêu bất thường dựa trên DANH MỤC và THIẾT LẬP NGƯỜI
-        // DÙNG
         if (transaction.getAmount() != null && "EXPENSE".equalsIgnoreCase(transaction.getType()) && user != null) {
             double amt = transaction.getAmount().doubleValue();
             String catName = "";
             Double catLimit = null;
 
-            // Lấy thông tin danh mục từ DB để có dữ liệu mới nhất (bao gồm cả limitAmount)
             if (transaction.getCategory() != null && transaction.getCategory().getId() != null) {
                 com.finance.tracker.model.Category dbCategory = categoryRepository
                         .findById(transaction.getCategory().getId()).orElse(null);
@@ -55,7 +52,6 @@ public class TransactionService {
             boolean isAnomaly = false;
             String reason = "";
 
-            // Kiểm tra tổng chi tiêu theo danh mục để phát hiện vượt hạn mức
             if (catLimit != null && transaction.getCategory() != null && transaction.getCategory().getId() != null) {
                 Double currentSpent = transactionRepository.sumExpenseByUserIdAndCategoryId(user.getId(),
                         transaction.getCategory().getId());
@@ -69,7 +65,6 @@ public class TransactionService {
 
             transaction.setIsAnomaly(isAnomaly);
 
-            // Gửi thông báo ngay lập tức nếu là bất thường (vượt hạn mức danh mục)
             if (isAnomaly) {
                 String title = "Cảnh báo chi tiêu!";
                 String body = "Bạn vừa ghi nhận khoản chi " + String.format("%,.0f", amt) + "đ. " + reason;

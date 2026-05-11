@@ -77,7 +77,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
             return savedUserId ? parseInt(savedUserId) : 1;
         } catch (e) {
             console.warn("AsyncStorage.getItem error for finance_user_id:", e);
-            return 1; // Default fallback
+            return 1;
         }
     };
 
@@ -110,7 +110,6 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
                 };
             });
 
-            // SẮP XẾP: Mới nhất lên đầu
             formattedTx.sort((a: any, b: any) => {
                 const dateA = new Date(a.date).getTime();
                 const dateB = new Date(b.date).getTime();
@@ -135,7 +134,6 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
         try {
             let categoryId = newTx.categoryId;
 
-            // Nếu chưa có categoryId (nhập từ AI hoặc text), thử tìm kiếm
             if (!categoryId) {
                 if (newTx.icon && typeof newTx.icon !== 'string') {
                     const iconName = newTx.icon.displayName || newTx.icon.name;
@@ -166,7 +164,6 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
                 }
             }
 
-            // Fallback cuối cùng: Lấy danh mục đầu tiên phù hợp với loại Thu/Chi
             if (!categoryId && categories.length > 0) {
                 const typeToMatch = newTx.isIncome ? 'INCOME' : 'EXPENSE';
                 const fallbackList = categories.filter(c => c.type === typeToMatch);
@@ -190,7 +187,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
 
             const response = await axios.post(API_TX_URL, dataToSend);
             if (response.status === 200 || response.status === 201) {
-                await fetchData(true); // Cập nhật lại danh sách ngay lập tức (ngầm)
+                await fetchData(true);
                 return true;
             }
             return false;
@@ -206,15 +203,12 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
             let currentCategoryId = updatedTx.categoryId;
             const expectedType = updatedTx.isIncome ? 'INCOME' : 'EXPENSE';
 
-            // KIỂM TRA MÂU THUẪN: Tìm danh mục hiện tại xem nó là Thu hay Chi
             const categoryToUse = categories.find(c => c.id === currentCategoryId);
             
-            // Nếu danh mục cũ không cùng loại với loại mới (Ví dụ đổi từ Chi sang Thu)
             if (!categoryToUse || categoryToUse.type !== expectedType) {
-                // Tự động tìm một danh mục bất kỳ thuộc loại mới (Thu/Chi) để thay thế
                 const fallbackList = categories.filter(c => c.type === expectedType);
                 if (fallbackList.length > 0) {
-                    currentCategoryId = fallbackList[0].id; // Lấy tạm danh mục đầu tiên làm mặc định
+                    currentCategoryId = fallbackList[0].id;
                 }
             }
 
@@ -223,13 +217,12 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
                 note: updatedTx.title,
                 type: expectedType,
                 transactionDate: updatedTx.date || new Date().toISOString().split('T')[0],
-                category: { id: currentCategoryId }, // Gửi danh mục đã được xử lý mâu thuẫn
+                category: { id: currentCategoryId },
                 user: { id: userId }
             };
 
             const response = await axios.put(`${API_TX_URL}/${id}`, dataToSend);
             
-            // Cập nhật lại danh sách trên màn hình
             await fetchData(true);
             return true;
         } catch (error) {

@@ -1,4 +1,3 @@
-// File: src/components/Sidebar/Sidebar.jsx
 import { Home, PieChart, List, Settings, LogOut } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
@@ -7,8 +6,8 @@ export default function Sidebar() {
 
     const navLinkClass = ({ isActive }) => {
         return `flex items-center space-x-3 px-4 py-3 rounded-xl font-medium transition-colors ${isActive
-            ? 'bg-black text-white dark:bg-white dark:text-black shadow-sm' // Active: Nền đen chữ trắng (Light) -> Nền trắng chữ đen (Dark)
-            : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white' // Inactive
+            ? 'bg-black text-white dark:bg-white dark:text-black shadow-sm'
+            : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
             }`;
     };
 
@@ -19,7 +18,6 @@ export default function Sidebar() {
     };
 
     return (
-        // Đã thêm dark:bg-gray-900 và dark:border-gray-800
         <aside className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col hidden md:flex transition-colors duration-300">
             <div className="p-6">
                 <h2 className="text-2xl font-black tracking-tight text-black dark:text-white transition-colors duration-300">

@@ -36,7 +36,6 @@ export default function ChatbotPanel() {
         setIsTyping(true);
 
         try {
-            // 1. XỬ LÝ XÁC NHẬN LƯU GIAO DỊCH BẤT THƯỜNG
             if (pendingTransaction && (
                 lowerInput.includes('rồi') || 
                 lowerInput.includes('ok') || 
@@ -52,7 +51,6 @@ export default function ChatbotPanel() {
                 return;
             }
 
-            // 2. THỬ XỬ LÝ NHƯ MỘT GIAO DỊCH MỚI
             try {
                 const response = await axios.get(`http://localhost:8080/api/ai/process`, {
                     params: { text: textToProcess, userId: savedUserId }
@@ -79,7 +77,6 @@ export default function ChatbotPanel() {
                     toast.success("Đã ghi chép!");
                 }
             } catch (err) {
-                // 3. NẾU KHÔNG PHẢI GIAO DỊCH (LỖI 400), CHUYỂN SANG HỎI ĐÁP/TÂM SỰ
                 if (err.response && err.response.status === 400) {
                     const askRes = await axios.get(`http://localhost:8080/api/ai/ask`, {
                         params: { text: textToProcess, userId: savedUserId }
@@ -91,7 +88,6 @@ export default function ChatbotPanel() {
                 }
             }
         } catch (error) {
-            // 🔥 FIX: Thay vì báo máy chủ bận chung chung, lấy luôn câu chửi của Backend lên (nếu có)
             const errorMsg = error.response?.data?.reply || "❌ Máy chủ đang bận hoặc hết hạn mức API, vui lòng thử lại sau!";
             setMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: errorMsg }]);
         } finally {
@@ -103,7 +99,6 @@ export default function ChatbotPanel() {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Giới hạn kích thước file (ví dụ: 5MB)
         if (file.size > 5 * 1024 * 1024) {
             toast.error("Ảnh quá lớn! Vui lòng chọn ảnh dưới 5MB.");
             return;
@@ -163,7 +158,7 @@ export default function ChatbotPanel() {
                             msg.isConfirmMsg ? 'bg-amber-50 border border-amber-200 text-amber-900 rounded-tl-sm' :
                             'bg-white text-gray-800 rounded-tl-sm'
                         }`}>
-                            {/* 🔥 SỬA LỖI ĐỎ REPLACE TẠI ĐÂY (ÉP KIỂU STRING) */}
+                            
                             <span dangerouslySetInnerHTML={{ __html: String(msg.text || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}></span>
                             
                             {msg.isConfirmMsg && pendingTx && (
@@ -190,7 +185,7 @@ export default function ChatbotPanel() {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
+            
             <div className="p-4 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 transition-colors">
                 <div className="flex items-center space-x-2">
                     <input
