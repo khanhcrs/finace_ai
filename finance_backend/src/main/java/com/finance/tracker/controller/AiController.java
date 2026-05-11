@@ -19,7 +19,7 @@
 
     @RestController
     @RequestMapping("/api/ai")
-    @CrossOrigin(origins = "*") // Đã mở cho mọi frontend
+    @CrossOrigin(origins = "*")
     public class AiController {
 
         @Autowired
@@ -37,16 +37,12 @@
         @Autowired
         private NotificationService notificationService;
 
-        // ==========================================
-        // 1. XỬ LÝ CHAT TỔNG HỢP (THÊM GIAO DỊCH & HỎI ĐÁP)
-        // ==========================================
         @GetMapping("/process")
         public ResponseEntity<?> process(
                 @RequestParam(value = "text") String text,
                 @RequestParam(value = "userId", defaultValue = "1") Long userId) {
 
             try {
-                // Lấy lịch sử giao dịch cung cấp cho AI
                 List<Transaction> userHistory = transactionRepository.findAll().stream()
                         .filter(t -> t.getUser() != null && t.getUser().getId().equals(userId))
                         .toList();
@@ -55,19 +51,16 @@
 
                 if (transactions != null && !transactions.isEmpty()) {
 
-                    // Xử lý Lỗi API (hết hạn mức, quá tải)
                     if (transactions.size() == 1 && transactions.get(0).getNote() != null && transactions.get(0).getNote().startsWith("ERROR|")) {
                         return ResponseEntity.ok(Map.of("mustConfirm", false, "reply", transactions.get(0).getNote().split("\\|")[1]));
                     }
 
-                    //  BẮT LUỒNG TÂM SỰ / PHÂN TÍCH (Không lưu vào DB)
                     if (transactions.size() == 1 && "CHAT".equals(transactions.get(0).getType())) {
                         String noteContent = transactions.get(0).getNote();
                         String aiReply = noteContent.startsWith("CHAT|") ? noteContent.substring(5).trim() : noteContent;
                         return ResponseEntity.ok(Map.of("mustConfirm", false, "saved", false, "reply", aiReply));
                     }
 
-                    // 🌟 BẮT LUỒNG GHI CHÉP GIAO DỊCH
                     User user = userRepository.findById(userId).orElse(null);
                     Transaction anomalyTx = null;
                     String anomalyReasonForChat = "";
@@ -86,7 +79,6 @@
                             botMessage = realNote.substring(botIdx + 9).trim();
                             realNote = realNote.substring(0, botIdx).trim();
                         }
-                        // Bóc lý do bất thường
                         String reason = "";
                         int idx = realNote.indexOf(" _REASON_");
                         if (idx != -1) {
@@ -94,7 +86,6 @@
                             realNote = realNote.substring(0, idx).trim();
                         }
 
-                        // Tìm hoặc Tạo mới danh mục
                         Category category = null;
                         if (user != null) {
                             List<Category> userCategories = categoryRepository.findByUserId(userId);
@@ -116,7 +107,6 @@
                         transaction.setNote(realNote);
                         transaction.setUser(user);
 
-                        // Xử lý báo cáo bất thường
                         if (transaction.getIsAnomaly() != null && transaction.getIsAnomaly()) {
                             if (anomalyTx == null) {
                                 anomalyTx = transaction;
@@ -157,9 +147,6 @@
             }
         }
 
-        // ==========================================
-        // 2. LƯU GIAO DỊCH ĐÃ XÁC NHẬN (CẢNH BÁO AI)
-        // ==========================================
         @PostMapping("/save-confirmed")
         public ResponseEntity<?> saveConfirmed(@RequestBody Transaction transaction, @RequestParam("userId") Long userId) {
             try {
@@ -186,9 +173,6 @@
             }
         }
 
-        // ==========================================
-        // 3. XỬ LÝ HÓA ĐƠN BẰNG HÌNH ẢNH
-        // ==========================================
         @PostMapping(value = "/process-receipt", consumes = { "multipart/form-data" })
         public ResponseEntity<?> processReceipt(
                 @RequestParam("file") MultipartFile file,
@@ -238,7 +222,6 @@
         try {
             String text = geminiService.transcribeAudio(file);
             if (text != null && !text.isEmpty()) {
-                // Trả về đoạn text để Frontend điền vào ô nhập liệu
                 return ResponseEntity.ok(Map.of("text", text));
             }
             return ResponseEntity.badRequest().body(Map.of("reply", "Không thể nhận diện âm thanh."));

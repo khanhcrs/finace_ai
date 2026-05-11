@@ -98,7 +98,6 @@ export default function SettingsScreen() {
     }
   };
 
-  // Category management state
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [isSeeAllCategories, setIsSeeAllCategories] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -501,7 +500,7 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* PROFILE EDIT MODAL */}
+      
       <Modal animationType="slide" transparent={true} visible={isEditingProfile} onRequestClose={() => setIsEditingProfile(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={[styles.modalContent, { backgroundColor: theme.card, borderRadius: 24, height: 'auto', maxHeight: '80%', width: '100%' }]}>

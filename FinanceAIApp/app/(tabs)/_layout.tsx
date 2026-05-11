@@ -24,7 +24,6 @@ export default function TabLayout() {
 
             notifications.forEach(async (notif: any) => {
                 Alert.alert(notif.title, notif.message);
-                // Đánh dấu đã đọc
                 await axios.put(`${API_BASE_URL}/notifications/${notif.id}/read`);
             });
         } catch (error) {

@@ -1,4 +1,3 @@
-// File: src/screen/LoginScreen.jsx (Hoặc LoginScreen/LoginScreen.jsx tùy cấu trúc của bạn)
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -6,22 +5,18 @@ import axios from 'axios';
 export default function LoginScreen() {
     const navigate = useNavigate();
 
-    // STATE CỐT LÕI: Biến này quyết định đang hiện form Đăng nhập (true) hay Đăng ký (false)
     const [isLogin, setIsLogin] = useState(true);
 
-    // Các state lưu dữ liệu nhập vào
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
-    // Hàm xử lý chung cho cả Đăng nhập & Đăng ký
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError(''); // Xóa lỗi cũ trước khi gửi request mới
+        setError('');
 
         if (isLogin) {
-            // ---------------- LUỒNG ĐĂNG NHẬP ----------------
             try {
                 const response = await axios.post('http://localhost:8080/api/users/login', {
                     email: email,
@@ -37,7 +32,6 @@ export default function LoginScreen() {
                 setError("Sai email hoặc mật khẩu. Vui lòng thử lại!");
             }
         } else {
-            // ---------------- LUỒNG ĐĂNG KÝ ----------------
             try {
                 await axios.post('http://localhost:8080/api/users/register', {
                     fullName: fullName,
@@ -46,7 +40,6 @@ export default function LoginScreen() {
                 });
 
                 alert("Đăng ký thành công! Hãy đăng nhập để tiếp tục.");
-                // Chuyển form về lại trạng thái Đăng nhập, giữ nguyên email, chỉ xóa mật khẩu
                 setIsLogin(true);
                 setPassword('');
 
@@ -56,17 +49,16 @@ export default function LoginScreen() {
         }
     };
 
-    // Hàm tiện ích để chuyển đổi giữa 2 chế độ
     const toggleMode = () => {
         setIsLogin(!isLogin);
-        setError(''); // Chuyển form thì xóa thông báo lỗi đi cho sạch
+        setError('');
     };
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4 transition-colors duration-500">
             <div className="max-w-md w-full bg-white rounded-[32px] shadow-xl p-8 sm:p-10 border border-gray-100 animate-in fade-in zoom-in duration-300">
 
-                {/* Logo & Tiêu đề linh hoạt */}
+                
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-black text-white font-bold text-3xl mb-4 shadow-lg transition-transform hover:scale-105">F</div>
                     <h2 className="text-2xl font-black text-gray-900 tracking-tight">
@@ -81,13 +73,13 @@ export default function LoginScreen() {
                     </p>
                 </div>
 
-                {/* Thông báo lỗi */}
+                
                 {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm font-bold rounded-xl text-center animate-in fade-in slide-in-from-top-2">{error}</div>}
 
-                {/* Form chung */}
+                
                 <form onSubmit={handleSubmit} className="space-y-5">
 
-                    {/* Ô Họ tên: CHỈ HIỆN KHI Ở CHẾ ĐỘ ĐĂNG KÝ */}
+                    
                     {!isLogin && (
                         <div className="animate-in fade-in slide-in-from-top-4 duration-300">
                             <label className="block text-sm font-bold text-gray-700 mb-2">Họ và tên</label>
@@ -125,7 +117,7 @@ export default function LoginScreen() {
                     </button>
                 </form>
 
-                {/* Nút lật mặt form */}
+                
                 <p className="text-center text-sm text-gray-500 font-medium mt-8">
                     {isLogin ? "Chưa có tài khoản? " : "Đã có tài khoản? "}
                     <button onClick={toggleMode} className="text-black font-bold hover:underline cursor-pointer">

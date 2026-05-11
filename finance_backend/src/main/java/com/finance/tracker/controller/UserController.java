@@ -22,7 +22,6 @@ public class UserController {
     @Autowired
     private UserService userService;
 
-    // KHAI BÁO THÊM SERVICE ĐỂ THAO TÁC VỚI BẢNG DANH MỤC
     @Autowired
     private CategoryService categoryService;
 
@@ -31,18 +30,14 @@ public class UserController {
         return userService.getAllUsers();
     }
 
-    // 1. API ĐĂNG KÝ (Đã nâng cấp: Tự động cấp vốn danh mục)
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
-        // Kiểm tra trùng Email
         if (userService.findByEmail(user.getEmail()).isPresent()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Email này đã được sử dụng!");
         }
 
-        // 1. Lưu user mới vào DB
         User savedUser = userService.saveUser(user);
 
-        // 2. TỰ ĐỘNG TẠO 4 DANH MỤC MẶC ĐỊNH CHO USER NÀY
         String[][] defaultCats = {
                 { "Ăn uống", "EXPENSE", "Coffee" },
                 { "Di chuyển", "EXPENSE", "Car" },
@@ -52,35 +47,30 @@ public class UserController {
 
         for (String[] catData : defaultCats) {
             Category cat = new Category();
-            cat.setUser(savedUser); // Gắn chặt danh mục này với ông User vừa tạo
+            cat.setUser(savedUser);
             cat.setName(catData[0]);
             cat.setType(catData[1]);
             cat.setIcon(catData[2]);
-            categoryService.saveCategory(cat); // Đẩy xuống database
+            categoryService.saveCategory(cat);
         }
 
         return ResponseEntity.ok(savedUser);
     }
 
-    // 2. API ĐĂNG NHẬP (Giữ nguyên)
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
         String email = credentials.get("email");
         String password = credentials.get("password");
 
-        // Tìm user theo email
         Optional<User> userOpt = userService.findByEmail(email);
 
-        // Nếu thấy user VÀ mật khẩu gửi lên khớp với passwordHash trong DB
         if (userOpt.isPresent() && userOpt.get().getPasswordHash().equals(password)) {
-            return ResponseEntity.ok(userOpt.get()); // Trả về thông tin User cho React lưu LocalStorage
+            return ResponseEntity.ok(userOpt.get());
         }
         
-        // Nếu sai thì báo lỗi 401 Unauthorized
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sai email hoặc mật khẩu!");
     }
 
-    // 3. LẤY THÔNG TIN CHI TIẾT USER
     @GetMapping("/{id}")
     public ResponseEntity<User> getUser(@PathVariable Long id) {
         return userService.getUserById(id)
@@ -88,7 +78,6 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // 4. CẬP NHẬT NGƯỠNG CHI TIÊU
     @PutMapping("/{id}/thresholds")
     public ResponseEntity<?> updateThresholds(@PathVariable Long id, @RequestBody Map<String, Double> thresholds) {
         Optional<User> userOpt = userService.getUserById(id);
@@ -108,7 +97,6 @@ public class UserController {
         return ResponseEntity.notFound().build();
     }
 
-    // 5. CẬP NHẬT THÔNG TIN CÁ NHÂN
     @PutMapping("/{id}/profile")
     public ResponseEntity<?> updateProfile(@PathVariable Long id, @RequestBody Map<String, String> profileData) {
         Optional<User> userOpt = userService.getUserById(id);

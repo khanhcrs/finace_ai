@@ -22,7 +22,6 @@ public class User {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
-    // Hạn mức chi tiêu bất thường (người dùng tự chỉnh)
     @Column(name = "threshold_eating")
     private Double thresholdEating = 500000.0;
 

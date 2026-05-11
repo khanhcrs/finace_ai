@@ -8,7 +8,6 @@ import { Colors } from '../../src/theme/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 
-// Import Components
 import BalanceCard from '../../src/components/BalanceCard';
 import SummaryCards from '../../src/components/SummaryCards';
 import TransactionItem from '../../src/components/TransactionItem';
@@ -69,7 +68,7 @@ export default function HomeScreen() {
               <TransactionItem
                 key={tx.id}
                 transaction={tx}
-                onPress={() => { }} // Could navigate to edit
+                onPress={() => { }}
               />
             ))}
 

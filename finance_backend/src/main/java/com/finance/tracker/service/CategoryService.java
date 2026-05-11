@@ -21,7 +21,6 @@ public class CategoryService {
     public List<Category> getCategoriesByUser(Long userId) {
         List<Category> categories = categoryRepository.findByUserId(userId);
         
-        // Nếu chưa có danh mục nào, tạo mặc định
         if (categories.isEmpty()) {
             User user = userRepository.findById(userId).orElse(null);
             if (user != null) {

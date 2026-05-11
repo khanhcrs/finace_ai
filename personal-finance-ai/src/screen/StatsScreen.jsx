@@ -1,4 +1,3 @@
-// File: src/screens/StatsScreen/StatsScreen.jsx
 import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { formatCurrency } from '../utils/format';
@@ -11,11 +10,10 @@ const COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'
 export default function StatsScreen() {
     const { chartType, darkMode } = useSettings();
     const { transactions } = useTransaction();
-    const [range, setRange] = useState('all'); // all, 7days, month, year, custom
+    const [range, setRange] = useState('all');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
-    // Tự động chuyển sang 'custom' khi người dùng nhập ngày
     useEffect(() => {
         if (startDate || endDate) {
             setRange('custom');
@@ -30,7 +28,6 @@ export default function StatsScreen() {
         }
     };
 
-    // --- THUẬT TOÁN LỌC ---
     const filterByRange = (txs) => {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -62,7 +59,7 @@ export default function StatsScreen() {
             if (range === 'year') {
                 return txDate.getFullYear() === now.getFullYear();
             }
-            return true; // all
+            return true;
         });
     };
 
@@ -91,10 +88,10 @@ export default function StatsScreen() {
                     <p className="text-gray-500 dark:text-gray-400 mt-1 transition-colors">Phân tích dòng tiền của bạn</p>
                 </div>
 
-                {/* KHU VỰC BỘ LỌC TÁCH BIỆT */}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     
-                    {/* 1. Bộ lọc mặc định */}
+                    
                     <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
                         <div className="flex items-center space-x-2 mb-3 text-gray-400">
                             <Filter size={16} />
@@ -120,7 +117,7 @@ export default function StatsScreen() {
                         </div>
                     </div>
 
-                    {/* 2. Bộ lọc tùy chỉnh */}
+                    
                     <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
                         <div className="flex items-center space-x-2 mb-3 text-gray-400">
                             <Calendar size={16} />

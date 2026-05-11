@@ -11,7 +11,6 @@ export default function SettingsScreen() {
     
     const [isLoading, setIsLoading] = useState(false);
 
-    // Category states
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [newCategory, setNewCategory] = useState({ name: '', type: 'EXPENSE', icon: 'HelpCircle', limitAmount: '' });
     const [editingCategoryId, setEditingCategoryId] = useState(null);
@@ -39,7 +38,7 @@ export default function SettingsScreen() {
             toast.success("Đã thêm danh mục mới!");
             setIsAddingCategory(false);
             setNewCategory({ name: '', type: 'EXPENSE', icon: 'HelpCircle', limitAmount: '' });
-            fetchData(); // Refresh categories from context
+            fetchData();
         } catch (e) {
             toast.error("Lỗi khi thêm danh mục");
         }
@@ -80,7 +79,7 @@ export default function SettingsScreen() {
 
             <div className="space-y-6">
 
-                {/* 1. THÔNG TIN TÀI KHOẢN */}
+                
                 <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 shadow-sm transition-colors duration-300">
                     <div className="flex items-center space-x-3 mb-6">
                         <User className="text-gray-400 dark:text-gray-500" size={24} />
@@ -103,7 +102,7 @@ export default function SettingsScreen() {
                     </div>
                 </div>
 
-                {/* 2. QUẢN LÝ DANH MỤC & HẠN MỨC (NEW) */}
+                
                 <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 shadow-sm transition-colors duration-300">
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center space-x-3">
@@ -253,7 +252,7 @@ export default function SettingsScreen() {
                     </div>
                 </div>
 
-                {/* 3. TUỲ CHỈNH GIAO DIỆN */}
+                
                 <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 shadow-sm transition-colors duration-300">
                     <div className="flex items-center space-x-3 mb-6">
                         <Palette className="text-gray-400 dark:text-gray-500" size={24} />
@@ -276,7 +275,7 @@ export default function SettingsScreen() {
                     </div>
                 </div>
 
-                {/* 4. TUỲ CHỈNH BÁO CÁO */}
+                
                 <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 shadow-sm transition-colors duration-300">
                     <div className="flex items-center space-x-3 mb-6">
                         <PieChart className="text-gray-400 dark:text-gray-500" size={24} />

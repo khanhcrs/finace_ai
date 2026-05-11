@@ -1,9 +1,9 @@
-/** @type {import('tailwindcss').Config} */
+
 export default {
-  darkMode: 'class', // <--- Chỉ cần 1 dòng này là đủ pháp thuật
+  darkMode: 'class',
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./src*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {

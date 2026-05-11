@@ -16,10 +16,8 @@ function InitialLayout() {
     const inAuthGroup = segments[0] === 'auth';
 
     if (!user && !inAuthGroup) {
-      // Redirect to login if not authenticated
       router.replace('/auth/login');
     } else if (user && inAuthGroup) {
-      // Redirect to home if authenticated but in auth screens
       router.replace('/(tabs)');
     }
   }, [user, isLoading, segments]);

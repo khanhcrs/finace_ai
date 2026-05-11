@@ -9,7 +9,6 @@ import { Colors } from '../../src/theme/Colors';
 import { PieChart } from 'react-native-chart-kit';
 import { ArrowUpCircle, ArrowDownCircle, Wallet, X, Calendar, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react-native';
 
-// Bảng màu tự động cho các danh mục trong biểu đồ chi tiết
 const CATEGORY_COLORS = [
   '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
   '#FF9F40', '#F77825', '#55CB70', '#C45850', '#8e5ea2',
@@ -106,7 +105,6 @@ export default function StatsScreen() {
       .map((key, index) => ({
         name: key,
         amount: details[key],
-        // Gán tự động một màu trong mảng cho mỗi danh mục
         color: CATEGORY_COLORS[index % CATEGORY_COLORS.length]
       }))
       .sort((a, b) => b.amount - a.amount);
@@ -114,7 +112,6 @@ export default function StatsScreen() {
 
   const currentDetails = getCategoryDetails(detailsType === 'income');
 
-  // Chuẩn bị dữ liệu vẽ PieChart trong Popup Chi tiết
   const detailsPieData = currentDetails.map(item => ({
     name: item.name,
     amount: item.amount,
@@ -381,7 +378,7 @@ export default function StatsScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* MODAL 1: CHỌN THỜI GIAN */}
+      
       <Modal animationType="slide" transparent={true} visible={timePickerVisible} onRequestClose={() => setTimePickerVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.timeModalContent, { backgroundColor: theme.card }]}>
@@ -429,7 +426,7 @@ export default function StatsScreen() {
         </View>
       </Modal>
 
-      {/* MODAL 2: CHI TIẾT THU / CHI */}
+      
       <Modal animationType="slide" transparent={true} visible={detailsVisible} onRequestClose={() => setDetailsVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
@@ -445,27 +442,27 @@ export default function StatsScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               {currentDetails.length > 0 ? (
                 <>
-                  {/* BIỂU ĐỒ TRÒN TRONG MODAL CHI TIẾT */}
+                  
                   <View style={{ alignItems: 'center', marginBottom: 20 }}>
                     <PieChart
                       data={detailsPieData}
-                      width={screenWidth - 48} // Chiều rộng bằng màn hình trừ padding 2 bên
+                      width={screenWidth - 48}
                       height={160}
                       chartConfig={{ color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})` }}
                       accessor="amount"
                       backgroundColor="transparent"
                       paddingLeft="15"
                       center={[0, 0]}
-                      absolute={false} // Hiển thị phần trăm (%) để giống biểu đồ ngoài trang chủ
+                      absolute={false}
                     />
                   </View>
 
-                  {/* DANH SÁCH CHI TIẾT CÓ KÈM DẤU CHẤM MÀU */}
+                  
                   {currentDetails.map((item, index) => (
                     <View key={index} style={[styles.detailRow, { borderBottomColor: theme.border }]}>
 
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {/* Chấm tròn biểu thị màu của danh mục */}
+                        
                         <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: item.color, marginRight: 10 }} />
                         <Text style={[styles.detailName, { color: theme.text }]}>{item.name}</Text>
                       </View>
@@ -553,7 +550,7 @@ const styles = StyleSheet.create({
   footerBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   footerBtnText: { fontSize: 16, fontWeight: 'bold' },
 
-  modalContent: { height: '70%', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 }, // Tăng height lên 70% để chứa biểu đồ rộng rãi hơn
+  modalContent: { height: '70%', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
   closeBtn: { padding: 8, backgroundColor: 'rgba(150,150,150,0.15)', borderRadius: 20 },

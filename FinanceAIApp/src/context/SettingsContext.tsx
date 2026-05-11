@@ -13,14 +13,12 @@ type SettingsContextType = {
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
-// Safe storage wrapper to handle "Native module is null" errors
 const safeStorage = {
     getItem: async (key: string) => {
         try {
             return await AsyncStorage.getItem(key);
         } catch (e) {
             console.warn(`AsyncStorage.getItem error for ${key}:`, e);
-            // Fallback for web if AsyncStorage fails
             if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
                 return window.localStorage.getItem(key);
             }
@@ -46,7 +44,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [isLoaded, setIsLoaded] = useState(false);
     const isFirstRender = useRef(true);
 
-    // Load initial values
     useEffect(() => {
         const loadSettings = async () => {
             try {
@@ -66,7 +63,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         loadSettings();
     }, []);
 
-    // Save changes - only after initial load and when values actually change
     useEffect(() => {
         if (isFirstRender.current) {
             isFirstRender.current = false;
