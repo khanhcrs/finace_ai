@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.HashMap;
 
 @Service
 public class GeminiService {
@@ -106,45 +107,77 @@ public class GeminiService {
     // ==========================================
     // 1. XỬ LÝ TEXT CHAT TỔNG HỢP (GHI CHÉP & HỎI ĐÁP)
     // ==========================================
+    // ==========================================
+    // 1. XỬ LÝ TEXT CHAT TỔNG HỢP (GHI CHÉP & HỎI ĐÁP)
+    // ==========================================
     public List<Transaction> processChat(String userInput, List<Transaction> history) {
         String today = LocalDate.now().toString();
+        String currentMonth = today.substring(0, 7); // Lấy chuỗi "YYYY-MM" để lọc tháng hiện tại
+        java.text.DecimalFormat df = new java.text.DecimalFormat("#,###");
 
+        // --- BƯỚC 1: TÍNH TOÁN HẠN MỨC VÀ SỐ TIỀN ĐÃ CHI TRONG THÁNG NÀY ---
+        Map<String, Double> categoryLimits = new java.util.HashMap<>();
+        Map<String, Double> categorySpent = new java.util.HashMap<>();
         StringBuilder historyStr = new StringBuilder();
-        if (history != null && !history.isEmpty()) {
-            java.text.DecimalFormat df = new java.text.DecimalFormat("#,###");
 
-            historyStr.append("LỊCH SỬ GIAO DỊCH TRONG THÁNG CỦA NGƯỜI DÙNG:\n");
+        if (history != null && !history.isEmpty()) {
+            historyStr.append("LỊCH SỬ GIAO DỊCH CỦA NGƯỜI DÙNG:\n");
             for (Transaction t : history) {
                 String loai = "INCOME".equalsIgnoreCase(t.getType()) ? "Thu" : "Chi";
                 String cat = t.getCategory() != null ? t.getCategory().getName() : "Khác";
-
                 String formattedAmount = df.format(t.getAmount()).replace(",", ".");
 
+                // Nạp vào chuỗi lịch sử cho AI đọc
                 historyStr.append(String.format("- Ngày %s: %s %sđ (%s) - Ghi chú: %s\n",
                         t.getTransactionDate(), loai, formattedAmount, cat, t.getNote()));
+
+                // Tính tổng chi tiêu & Hạn mức (CHỈ LẤY GIAO DỊCH THÁNG NÀY)
+                if (t.getTransactionDate() != null && t.getTransactionDate().toString().startsWith(currentMonth)) {
+                    if ("EXPENSE".equalsIgnoreCase(t.getType()) && t.getCategory() != null) {
+                        double amount = t.getAmount() != null ? t.getAmount().doubleValue() : 0.0;
+                        categorySpent.put(cat, categorySpent.getOrDefault(cat, 0.0) + amount);
+
+                        Double limit = t.getCategory().getLimitAmount();
+                        if (limit != null && limit > 0) {
+                            categoryLimits.put(cat, limit);
+                        }
+                    }
+                }
             }
         } else {
             historyStr.append("Người dùng chưa có giao dịch nào.\n");
         }
 
+        // --- BƯỚC 2: TẠO BẢNG BÁO CÁO NGÂN SÁCH ĐỘNG CHO AI ---
+        StringBuilder budgetStr = new StringBuilder();
+        budgetStr.append("THÔNG TIN HẠN MỨC (BUDGET) TRONG THÁNG ").append(currentMonth).append(":\n");
+        if (categoryLimits.isEmpty()) {
+            budgetStr.append("- Người dùng chưa thiết lập hạn mức nào.\n");
+        } else {
+            for (String cat : categoryLimits.keySet()) {
+                double limit = categoryLimits.get(cat);
+                double spent = categorySpent.getOrDefault(cat, 0.0);
+                double remain = limit - spent;
+                budgetStr.append(String.format("- Danh mục '%s': Hạn mức %sđ, Đã chi %sđ, Còn lại %sđ.\n",
+                        cat, df.format(limit).replace(",", "."), df.format(spent).replace(",", "."),
+                        df.format(remain).replace(",", ".")));
+            }
+        }
+
+        // --- BƯỚC 3: BƠM TOÀN BỘ VÀO PROMPT CHO GEMINI ---
         String promptText = "Bạn là chuyên gia tài chính kiêm một người bạn thân thiết. Bạn PHẢI CHỈ TRẢ VỀ JSON ARRAY `[]`.\n\n"
-                +
-                "👉 TRƯỜNG HỢP 1: Ghi chép chi tiêu/thu nhập/SỰ CỐ MẤT TIỀN (VD: 'ăn phở 50k', 'nhận lương', 'rớt 500k', 'bị lừa')\n"
-                +
-                "Trả về JSON: [{\"amount\": số_tiền, \"date\": \"YYYY-MM-DD\", \"note\": \"nội dung\", \"type\": \"INCOME\" hoặc \"EXPENSE\", \"categoryName\": \"Danh mục\", \"isAnomaly\": true/false, \"anomalyReason\": \"lời trêu chọc\", \"botMessage\": \"lời nhắn gửi\"}]\n"
-                +
-                "- Luật: '50k' tự hiểu là 50000. \n" +
-                "- NẾU MẤT TIỀN, RỚT TIỀN: Đây là khoản CHI TIÊU đã xảy ra (isAnomaly = false để lưu luôn). Hãy viết lời an ủi sâu sắc vào trường `botMessage`.\n"
-                +
-                "- NẾU CHI TIÊU VÔ LÝ (ăn phở 500k): isAnomaly = true. Viết câu trêu chọc (và nhắc bấm nút Vẫn Lưu) vào trường `anomalyReason`.\n"
-                +
-                "- BÌNH THƯỜNG: isAnomaly = false. Có thể khen ngợi ngắn gọn vào `botMessage`.\n\n" +
-                "👉 TRƯỜNG HỢP 2: Hỏi đáp, nhờ phân tích, tâm sự (KHÔNG CÓ SỐ TIỀN THU CHI)\n" +
-                "👉 TRƯỜNG HỢP 2: Hỏi đáp, nhờ phân tích, báo cáo hoặc tâm sự...\n" +
-                "Trả về JSON Array ĐẶC BIỆT: [{\"amount\": 0, \"date\": \"" + today
-                + "\", \"note\": \"<VIẾT CÂU TRẢ LỜI>. Tuyệt đối không dùng phần thập phân khi viết số tiền (VD: dùng 600.000đ, KHÔNG DÙNG 600,000.00đ).\", \"type\": \"CHAT\", \"categoryName\": \"CHAT\", \"isAnomaly\": false, \"botMessage\": \"\"}]\n\n"
-                + historyStr.toString() + "\n\n" +
-                "Hôm nay là: " + today + "\nCâu của người dùng: '" + userInput + "'";
+                + "👉 TRƯỜNG HỢP 1: Ghi chép chi tiêu/thu nhập/SỰ CỐ MẤT TIỀN (VD: 'ăn phở 50k', 'nhận lương', 'rớt 500k', 'bị lừa')\n"
+                + "Trả về JSON: [{\"amount\": số_tiền, \"date\": \"YYYY-MM-DD\", \"note\": \"nội dung\", \"type\": \"INCOME\" hoặc \"EXPENSE\", \"categoryName\": \"Danh mục\", \"isAnomaly\": true/false, \"anomalyReason\": \"lời trêu chọc/cảnh báo\", \"botMessage\": \"lời nhắn gửi\"}]\n"
+                + "- Luật: '50k' tự hiểu là 50000. \n"
+                + "- NẾU KHOẢN CHI LÀM VƯỢT HẠN MỨC HOẶC GẦN HẾT HẠN MỨC (Dựa vào THÔNG TIN HẠN MỨC bên dưới): BẮT BUỘC isAnomaly = true. Hãy phân tích toán học và viết lời cảnh báo sắc bén vào `anomalyReason`.\n"
+                + "- NẾU MẤT TIỀN, RỚT TIỀN: isAnomaly = false để lưu luôn. Viết lời an ủi sâu sắc vào `botMessage`.\n"
+                + "- NẾU CHI TIÊU VÔ LÝ (ăn phở 500k): isAnomaly = true. Viết câu trêu chọc vào `anomalyReason`.\n\n"
+                + "👉 TRƯỜNG HỢP 2: Hỏi đáp, nhờ phân tích, báo cáo hoặc tâm sự...\n"
+                + "Trả về JSON Array ĐẶC BIỆT: [{\"amount\": 0, \"date\": \"" + today
+                + "\", \"note\": \"<VIẾT CÂU TRẢ LỜI>. Tuyệt đối không dùng phần thập phân khi viết số tiền (VD: 600.000đ).\", \"type\": \"CHAT\", \"categoryName\": \"CHAT\", \"isAnomaly\": false, \"botMessage\": \"\"}]\n\n"
+                + budgetStr.toString() + "\n\n"
+                + historyStr.toString() + "\n\n"
+                + "Hôm nay là: " + today + "\nCâu của người dùng: '" + userInput + "'";
 
         Map<String, Object> body = Map.of("contents", List.of(Map.of("parts", List.of(Map.of("text", promptText)))));
 
@@ -176,7 +209,6 @@ public class GeminiService {
                 transaction.setAmount(new BigDecimal(amtStr.isEmpty() ? "0" : amtStr));
 
                 String type = data.path("type").asText("EXPENSE");
-                // Bỏ qua nếu giao dịch rác (số tiền 0), NGOẠI TRỪ trường hợp tâm sự (CHAT)
                 if (transaction.getAmount().compareTo(BigDecimal.ZERO) == 0 && !type.equals("CHAT"))
                     continue;
 
@@ -210,19 +242,10 @@ public class GeminiService {
 
                 transaction.setNote(
                         data.path("categoryName").asText("Khác") + "|" + data.path("note").asText("") + reason);
-                String limitExceededReason = findCategoryLimitExceededReason(
-                        history,
-                        data.path("categoryName").asText("Khác"),
-                        transaction.getAmount(),
-                        type);
-                if (limitExceededReason != null && !limitExceededReason.isEmpty()) {
-                    transaction.setIsAnomaly(true);
-                    String noteWithReason = transaction.getNote();
-                    if (!noteWithReason.contains("_REASON_")) {
-                        noteWithReason = noteWithReason + " _REASON_" + limitExceededReason;
-                    }
-                    transaction.setNote(noteWithReason);
-                }
+
+                // Đã bỏ hàm findCategoryLimitExceededReason ở đây vì Gemini đã tự giác phân
+                // tích toán học rồi
+
                 transactions.add(transaction);
             }
             return transactions;
